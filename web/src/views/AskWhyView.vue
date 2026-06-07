@@ -2,7 +2,7 @@
   <section class="submit-workbench">
     <div class="submit-hero">
       <div>
-        <p class="eyebrow">AskWhy Recharge</p>
+        <p class="eyebrow">10666 Recharge</p>
         <h2>账号充值申请</h2>
       </div>
       <div class="submit-hero__meter">
@@ -17,7 +17,7 @@
     <div class="submit-flow">
       <aside class="submit-rail">
         <div class="rail-brand">
-          <span class="rail-mark">AW</span>
+          <span class="rail-mark">106</span>
           <div>
             <p class="eyebrow">Flow</p>
             <h2>提交流程</h2>

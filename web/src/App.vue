@@ -3,9 +3,9 @@
     <header class="user-header">
       <div class="page-inner user-header__inner">
         <div class="user-brand">
-          <span class="user-brand__mark">AW</span>
+          <span class="user-brand__mark">106</span>
           <div>
-            <p class="eyebrow">AskWhy Recharge</p>
+            <p class="eyebrow">10666 Recharge</p>
             <h1>{{ pageTitle }}</h1>
           </div>
         </div>
@@ -42,7 +42,7 @@ import { useRoute } from 'vue-router';
 const route = useRoute();
 
 const copy: Record<string, { title: string; eyebrow: string; description: string }> = {
-  recharge: { title: 'AskWhy 充值', eyebrow: 'Submit', description: '校验卡密、校验 Session，实时查看充值进度' },
+  recharge: { title: '10666 充值', eyebrow: 'Submit', description: '校验卡密、校验 Session，实时查看充值进度' },
   cards: { title: '卡密查询', eyebrow: 'Card Lookup', description: '批量查询卡密使用状况、充值账号与时间' },
 };
 

@@ -35,7 +35,7 @@
       <!-- ===== 卡密映射 ===== -->
       <template v-if="activeTab === 'mappings'">
         <el-form label-position="top" @submit.prevent>
-          <el-form-item label="真实 AskWhy 卡密（每行一个，最多 500）">
+          <el-form-item label="真实卡密（每行一个，最多 500）">
             <el-input v-model="importRaw" type="textarea" :rows="4" resize="vertical" placeholder="pro20xXXXXXXXXXX&#10;plusYYYYYYYYYY" />
           </el-form-item>
           <el-form-item label="备注（可选）">
@@ -229,12 +229,41 @@ function formatTime(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function fallbackCopy(text: string): boolean {
+  // 非安全上下文（http://IP 访问）下 navigator.clipboard 不可用，退回 execCommand。
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.position = 'fixed';
+  ta.style.top = '-9999px';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(ta);
+  return ok;
+}
+
 async function copyText(text: string) {
   try {
-    await navigator.clipboard.writeText(text);
-    ElMessage.success('已复制');
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      ElMessage.success('已复制');
+      return;
+    }
   } catch {
-    ElMessage.warning('复制失败，请手动复制');
+    // 安全上下文下仍失败则继续走兜底
+  }
+  if (fallbackCopy(text)) {
+    ElMessage.success('已复制');
+  } else {
+    ElMessage.warning('复制失败，请手动选择文本复制');
   }
 }
 
