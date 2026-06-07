@@ -3,7 +3,7 @@
     <header class="user-header">
       <div class="page-inner user-header__inner">
         <div class="user-brand">
-          <span class="user-brand__mark">106</span>
+          <span class="user-brand__mark"><BrandLogo /></span>
           <div>
             <p class="eyebrow">10666 Recharge</p>
             <h1>{{ pageTitle }}</h1>
@@ -38,6 +38,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
+import BrandLogo from './components/BrandLogo.vue';
 
 const route = useRoute();
 

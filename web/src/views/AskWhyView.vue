@@ -17,7 +17,7 @@
     <div class="submit-flow">
       <aside class="submit-rail">
         <div class="rail-brand">
-          <span class="rail-mark">106</span>
+          <span class="rail-mark"><BrandLogo /></span>
           <div>
             <p class="eyebrow">Flow</p>
             <h2>提交流程</h2>
@@ -178,6 +178,7 @@ import {
   type AskWhySubscription,
   type AskWhyTokenInfo,
 } from '../api/askwhy';
+import BrandLogo from '../components/BrandLogo.vue';
 
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
 const STATUS_LABELS: Record<string, string> = {
