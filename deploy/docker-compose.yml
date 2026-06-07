@@ -1,0 +1,46 @@
+# AskWhy 充值 — 部署编排（接 1Panel 现有 PostgreSQL + 外部网络）
+# 镜像由 GitHub Actions 推送到 ghcr.io；变量从同目录 .env 读取（见 .env.example）。
+#
+# 使用：
+#   1) cp .env.example .env && 填好 .env（数据库、密钥、口令）
+#   2) docker compose pull && docker compose up -d
+services:
+  backend:
+    image: ghcr.io/wangguo1230/aggregated_recharge-backend:latest
+    restart: unless-stopped
+    environment:
+      ASKWHY_DATABASE_URL: ${ASKWHY_DATABASE_URL}
+      ASKWHY_SECRET_KEY: ${ASKWHY_SECRET_KEY}
+      ASKWHY_ADMIN_TOKEN: ${ASKWHY_ADMIN_TOKEN}
+      ASKWHY_BASE_URL: ${ASKWHY_BASE_URL:-https://askwhy123.shop}
+      ASKWHY_API_PREFIX: ${ASKWHY_API_PREFIX:-/api}
+      ASKWHY_CORS_ALLOW_ORIGINS: ${ASKWHY_CORS_ALLOW_ORIGINS:-*}
+      ASKWHY_REQUEST_PROXY: ${ASKWHY_REQUEST_PROXY:-}
+      ASKWHY_HOST: 0.0.0.0
+      ASKWHY_PORT: 18424
+    networks:
+      - 1panel-network
+
+  web:
+    image: ghcr.io/wangguo1230/aggregated_recharge-web:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    networks:
+      - 1panel-network
+
+  admin:
+    image: ghcr.io/wangguo1230/aggregated_recharge-admin:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${ADMIN_PORT:-8081}:80"
+    networks:
+      - 1panel-network
+
+networks:
+  1panel-network:
+    external: true

@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# Env / secrets（任何目录下的 .env 都不提交）
+.env
+*.env
+!*.env.example
+
+# Node
+node_modules/
+web/dist/
+admin/dist/
+
+# Editor / OS
+.DS_Store

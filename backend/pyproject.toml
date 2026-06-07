@@ -1,0 +1,25 @@
+[project]
+name = "askwhy-recharge"
+version = "1.0.0"
+description = "AskWhy 充值接入服务（独立）"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "curl-cffi>=0.6",
+    "SQLAlchemy>=2.0",
+    "psycopg[binary]>=3.2",
+    "cryptography>=42.0",
+    "pydantic>=2.0",
+]
+
+[project.scripts]
+askwhy-center = "askwhy_recharge.center_main:main"
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["askwhy_recharge*"]

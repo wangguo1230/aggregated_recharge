@@ -1,0 +1,179 @@
+:root {
+  --recharge-bg: #f3f6f2;
+  --recharge-panel: #ffffff;
+  --recharge-panel-alt: #f8faf7;
+  --recharge-ink: #15211d;
+  --recharge-text: #1d2925;
+  --recharge-muted: #64726c;
+  --recharge-soft: #8a9791;
+  --recharge-line: #d7ded6;
+  --recharge-line-strong: #bfcac1;
+  --recharge-green: #087354;
+  --recharge-blue: #28677a;
+  --recharge-amber: #a36f08;
+  --recharge-red: #b33b2e;
+  --recharge-shadow: 0 16px 40px rgba(29, 41, 37, 0.08);
+  --recharge-shadow-soft: 0 8px 22px rgba(29, 41, 37, 0.06);
+  --recharge-radius: 8px;
+  --el-color-primary: #0b755a;
+  --el-color-success: #0b755a;
+  --el-color-warning: #a8661b;
+  --el-color-danger: #b33b2e;
+  --el-border-radius-base: 8px;
+  --el-font-family: "Aptos", "IBM Plex Sans", "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 16% 0%, rgba(8, 115, 84, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(243, 246, 242, 0) 340px),
+    var(--recharge-bg);
+  color: var(--recharge-text);
+  font-family: var(--el-font-family);
+  font-size: 14px;
+  letter-spacing: 0;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.page-shell {
+  min-height: 100vh;
+}
+
+.page-inner {
+  width: min(1180px, calc(100vw - 40px));
+  margin: 0 auto;
+}
+
+.page-card {
+  background: var(--recharge-panel);
+  border: 1px solid var(--recharge-line);
+  border-radius: var(--recharge-radius);
+  box-shadow: var(--recharge-shadow);
+}
+
+.surface {
+  border: 1px solid var(--recharge-line);
+  border-radius: var(--recharge-radius);
+  background: var(--recharge-panel);
+  box-shadow: var(--recharge-shadow-soft);
+}
+
+.muted {
+  color: var(--recharge-muted);
+}
+
+.el-button {
+  font-weight: 700;
+}
+
+.el-button + .el-button {
+  margin-left: 0;
+}
+
+/* 对话框页脚按钮恢复间距（全局清零后页脚按钮会贴在一起） */
+.el-dialog__footer .el-button + .el-button {
+  margin-left: 12px;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--recharge-green);
+  --el-button-border-color: var(--recharge-green);
+  --el-button-hover-bg-color: #0f8867;
+  --el-button-hover-border-color: #0f8867;
+  --el-button-active-bg-color: #075f47;
+  --el-button-active-border-color: #075f47;
+}
+
+.el-input__wrapper,
+.el-textarea__inner,
+.el-select__wrapper,
+.el-input-number .el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--recharge-line) inset;
+  background: #fff;
+}
+
+.el-input__wrapper:hover,
+.el-textarea__inner:hover,
+.el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--recharge-line-strong) inset;
+}
+
+.el-form-item__label {
+  color: var(--recharge-muted);
+  font-weight: 700;
+}
+
+.el-table {
+  --el-table-border-color: var(--recharge-line);
+  --el-table-header-bg-color: #edf3ee;
+  --el-table-header-text-color: #44504b;
+  --el-table-row-hover-bg-color: #f5f9f4;
+  border-radius: var(--recharge-radius);
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 800;
+}
+
+.el-table .cell {
+  line-height: 1.35;
+}
+
+.el-table .el-button.is-link {
+  font-weight: 800;
+}
+
+.el-dialog {
+  border-radius: var(--recharge-radius);
+}
+
+.el-dialog__header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--recharge-line);
+}
+
+.el-drawer__header {
+  margin-bottom: 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--recharge-line);
+  color: var(--recharge-text);
+  font-weight: 800;
+}
+
+.el-tag {
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.el-alert {
+  border-radius: var(--recharge-radius);
+}
+
+.el-empty {
+  padding: 34px 0;
+}
+
+.el-descriptions__label {
+  font-weight: 800;
+}
+
+.el-progress-bar__outer {
+  background-color: #e7eee7;
+}
+
+.mono {
+  font-family: "SFMono-Regular", "Cascadia Code", "Roboto Mono", monospace;
+}

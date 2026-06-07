@@ -1,0 +1,151 @@
+/* 管理后台控制台风格：实心、紧凑，区别于客户端的营销风。 */
+
+body {
+  background: #eef1f4;
+}
+
+.admin-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 深色实心顶栏 */
+.admin-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  padding: 0 24px;
+  background: #15211d;
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+}
+
+.admin-topbar__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--recharge-green);
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.admin-topbar__title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.admin-topbar__title strong {
+  font-size: 16px;
+  font-weight: 800;
+}
+.admin-topbar__title span {
+  font-size: 12px;
+  color: #9fb1aa;
+}
+
+.admin-topbar__spacer {
+  flex: 1;
+}
+
+.admin-topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #c8d3ce;
+}
+
+.admin-main {
+  flex: 1;
+  width: min(1280px, calc(100vw - 48px));
+  margin: 24px auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* 实心卡片 */
+.admin-card {
+  background: #fff;
+  border: 1px solid #d7ded6;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(21, 33, 29, 0.04);
+  padding: 18px 20px;
+}
+
+.admin-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eaeee9;
+}
+
+.admin-card__head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--recharge-ink);
+}
+.admin-card__head .kicker {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--recharge-soft);
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 居中登录 */
+.admin-login-wrap {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 8vh;
+}
+.admin-login {
+  width: 380px;
+  max-width: calc(100vw - 48px);
+}
+
+.admin-result-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 12px;
+  padding: 10px 12px;
+  background: #f4f8f5;
+  border: 1px solid #dde7df;
+  border-radius: 6px;
+  font-size: 13px;
+}
+.admin-result-bar strong {
+  color: var(--recharge-green);
+}
+
+.admin-section-gap {
+  margin-top: 22px;
+}
+
+/* 紧凑表格 */
+.admin-card .el-table {
+  font-size: 13px;
+}
+.admin-card .el-form-item {
+  margin-bottom: 14px;
+}
