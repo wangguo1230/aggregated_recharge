@@ -49,3 +49,26 @@ class ImportMappingsRequest(BaseModel):
 
 class MappingStatusRequest(BaseModel):
     status: str = Field(..., pattern="^(active|disabled)$")
+
+
+# ---- 接码（短信）相关请求体 ----
+class SmsVerifyRequest(BaseModel):
+    # 接码兑换码（外部码），校验后返回手机号。
+    card_code: str = Field(..., alias="cardCode", min_length=1)
+
+    model_config = {"populate_by_name": True}
+
+
+class SmsFetchRequest(BaseModel):
+    # 接码兑换码（外部码），后端解析真实卡取查询 URL 拉取短信。
+    card_code: str = Field(..., alias="cardCode", min_length=1)
+
+    model_config = {"populate_by_name": True}
+
+
+class SmsImportMappingsRequest(BaseModel):
+    # 真实接码卡密列表，每条形如 手机号----查询URL；系统为每条生成兑换码。
+    real_cards: list[str] = Field(..., alias="realCards", max_length=500)
+    note: str = Field("", max_length=255)
+
+    model_config = {"populate_by_name": True}

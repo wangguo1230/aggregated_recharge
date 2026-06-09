@@ -3,6 +3,8 @@
 - AskWhyOrderModel：每次充值的真实卡密与 Session JSON（均加密存储）、AskWhy 订单号、
   状态与订阅快照，便于事后对账与售后；额外记录提交时使用的外部码。
 - AskWhyCardMappingModel：外部码 ↔ 真实 AskWhy 卡密映射（真实卡加密存储）。
+- SmsCardMappingModel：外部码（兑换码）↔ 接码卡密（手机号----查询URL）映射；
+  整串加密存储，手机号另存明文列供展示与检索，查询 URL 绝不暴露给客户端。
 """
 
 from __future__ import annotations
@@ -68,6 +70,31 @@ class AskWhyCardMappingModel(Base):
     # 录入时校验得到的套餐信息（仅管理端展示，外部码本身不含类型）。
     card_type: Mapped[str] = mapped_column(String(40), default="")
     card_type_label: Mapped[str] = mapped_column(String(80), default="")
+
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    note: Mapped[str] = mapped_column(String(255), default="")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class SmsCardMappingModel(Base):
+    __tablename__ = "sms_card_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # 对客户暴露的兑换码：display 带分隔符（前缀 SM），norm 为归一化唯一键。
+    external_code: Mapped[str] = mapped_column(String(64), default="")
+    external_code_norm: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+
+    # 真实接码卡密（手机号----查询URL）：整串加密，fingerprint 用于去重。
+    real_card_encrypted: Mapped[str] = mapped_column(Text, default="")
+    real_card_fingerprint: Mapped[str] = mapped_column(String(80), default="", index=True)
+
+    # 手机号明文存储：需展示给客户并支持管理端检索；查询 URL 仅在加密串中、不单独落明文。
+    phone: Mapped[str] = mapped_column(String(40), default="", index=True)
 
     status: Mapped[str] = mapped_column(String(20), default="active", index=True)
     note: Mapped[str] = mapped_column(String(255), default="")

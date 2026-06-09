@@ -25,9 +25,12 @@ def _random_body() -> str:
     return "".join(secrets.choice(_ALPHABET) for _ in range(_BODY_LEN))
 
 
-def generate_external_code() -> tuple[str, str]:
-    """生成 (展示码, 归一化码)。展示码带分隔符便于阅读。"""
+def generate_external_code(prefix: str = _PREFIX) -> tuple[str, str]:
+    """生成 (展示码, 归一化码)。展示码带分隔符便于阅读。
+
+    prefix 区分业务线（充值卡用 AW，接码卡用 SM），不影响归一化查找逻辑。
+    """
 
     body = _random_body()
-    display = f"{_PREFIX}-{body[:5]}-{body[5:]}"
+    display = f"{prefix}-{body[:5]}-{body[5:]}"
     return display, normalize_external_code(display)

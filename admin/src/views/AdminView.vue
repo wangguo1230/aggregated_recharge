@@ -23,10 +23,11 @@
         <el-tabs v-model="activeTab" style="flex: 1; margin-bottom: -14px" @tab-change="onTabChange">
           <el-tab-pane label="卡密映射" name="mappings" />
           <el-tab-pane label="充值记录" name="orders" />
+          <el-tab-pane label="接码卡密" name="sms" />
         </el-tabs>
         <div class="admin-toolbar">
           <span style="font-size: 13px; color: var(--recharge-muted)">
-            {{ activeTab === 'mappings' ? `映射 ${mappings.length}` : `记录 ${orders.length}` }}
+            {{ tabCountLabel }}
           </span>
           <el-button size="small" @click="handleLogout">退出登录</el-button>
         </div>
@@ -116,7 +117,7 @@
       </template>
 
       <!-- ===== 充值记录 ===== -->
-      <template v-else>
+      <template v-else-if="activeTab === 'orders'">
         <div class="admin-card__head" style="border: none; margin: 0 0 6px; padding: 0">
           <div><p class="kicker">Orders</p><h3>充值记录</h3></div>
           <div class="admin-toolbar">
@@ -159,31 +160,123 @@
           </el-table-column>
         </el-table>
       </template>
+
+      <!-- ===== 接码卡密 ===== -->
+      <template v-else>
+        <el-form label-position="top" @submit.prevent>
+          <el-form-item label="接码卡密（每行一个，格式 手机号----查询URL，最多 500）">
+            <el-input
+              v-model="smsImportRaw"
+              type="textarea"
+              :rows="4"
+              resize="vertical"
+              placeholder="13527097093----https://api.k8sms.com/q/xxxxxxxx"
+            />
+          </el-form-item>
+          <el-form-item label="备注（可选）">
+            <el-input v-model.trim="smsImportNote" maxlength="255" placeholder="例如 批次/来源" style="max-width: 360px" />
+          </el-form-item>
+          <el-button :loading="smsImporting" type="primary" @click="handleSmsImport">导入并生成兑换码</el-button>
+        </el-form>
+
+        <template v-if="smsImportResults.length">
+          <div class="admin-result-bar">
+            <span>导入结果</span>
+            <strong>新建 {{ smsImportCreated }} / 共 {{ smsImportResults.length }}</strong>
+            <el-button size="small" @click="copyNewSmsExternals">复制全部新兑换码</el-button>
+          </div>
+          <el-table :data="smsImportResults" border size="small" empty-text="无结果">
+            <el-table-column label="手机号" min-width="140">
+              <template #default="{ row }"><span class="mono">{{ row.phone || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column label="兑换码" min-width="170">
+              <template #default="{ row }"><span class="mono">{{ row.externalCode || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column label="结果" width="90">
+              <template #default="{ row }">
+                <el-tag :type="smsImportTagType(row.status)" size="small">{{ smsImportLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="说明" min-width="150" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.message || '-' }}</template>
+            </el-table-column>
+          </el-table>
+        </template>
+
+        <div class="admin-card__head admin-section-gap">
+          <div><p class="kicker">SMS Cards</p><h3>接码卡密列表</h3></div>
+          <div class="admin-toolbar">
+            <el-switch v-model="revealReal" active-text="显示完整卡密" />
+            <el-input v-model.trim="smsSearch" placeholder="搜兑换码/手机号" style="width: 180px" clearable @keyup.enter="loadSmsMappings" />
+            <el-button :loading="smsLoading" @click="loadSmsMappings">刷新</el-button>
+          </div>
+        </div>
+        <el-table v-loading="smsLoading" :data="smsMappings" border empty-text="暂无接码卡密">
+          <el-table-column label="兑换码" min-width="170">
+            <template #default="{ row }">
+              <span class="mono">{{ row.externalCode }}</span>
+              <el-button link type="primary" size="small" @click="copyText(row.externalCode)">复制</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="手机号" min-width="140">
+            <template #default="{ row }"><span class="mono">{{ row.phone || '-' }}</span></template>
+          </el-table-column>
+          <el-table-column label="完整卡密（手机号----URL）" min-width="240" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span class="mono">{{ revealReal ? row.realCard : `${row.phone}----******` }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
+                {{ row.status === 'active' ? '启用' : '停用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="110" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.note || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="150">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="toggleSmsStatus(row)">
+                {{ row.status === 'active' ? '停用' : '启用' }}
+              </el-button>
+              <el-button link type="danger" size="small" @click="removeSmsMapping(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
     </div>
   </template>
 </template>
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   adminCheck,
   deleteMapping,
+  deleteSmsMapping,
   getAdminToken,
   importMappings,
+  importSmsMappings,
   listMappings,
   listOrders,
+  listSmsMappings,
   setAdminToken,
   updateMappingStatus,
+  updateSmsMappingStatus,
   type ImportResultItem,
   type MappingItem,
   type OrderItem,
+  type SmsImportResultItem,
+  type SmsMappingItem,
 } from '../api/admin';
 
 const authed = ref(false);
 const tokenInput = ref('');
 const loggingIn = ref(false);
-const activeTab = ref<'mappings' | 'orders'>('mappings');
+const activeTab = ref<'mappings' | 'orders' | 'sms'>('mappings');
 const revealReal = ref(false);
 
 const importRaw = ref('');
@@ -199,6 +292,21 @@ const search = ref('');
 const orders = ref<OrderItem[]>([]);
 const ordersLoading = ref(false);
 const orderSearch = ref('');
+
+const smsImportRaw = ref('');
+const smsImportNote = ref('');
+const smsImporting = ref(false);
+const smsImportResults = ref<SmsImportResultItem[]>([]);
+const smsImportCreated = ref(0);
+const smsMappings = ref<SmsMappingItem[]>([]);
+const smsLoading = ref(false);
+const smsSearch = ref('');
+
+const tabCountLabel = computed(() => {
+  if (activeTab.value === 'orders') return `记录 ${orders.value.length}`;
+  if (activeTab.value === 'sms') return `接码卡密 ${smsMappings.value.length}`;
+  return `映射 ${mappings.value.length}`;
+});
 
 const ORDER_LABELS: Record<string, string> = {
   PENDING: '待处理',
@@ -302,11 +410,92 @@ function handleLogout() {
   mappings.value = [];
   orders.value = [];
   importResults.value = [];
+  smsMappings.value = [];
+  smsImportResults.value = [];
 }
 
 function onTabChange() {
   if (activeTab.value === 'orders' && !orders.value.length) {
     void loadOrders();
+  }
+  if (activeTab.value === 'sms' && !smsMappings.value.length) {
+    void loadSmsMappings();
+  }
+}
+
+function smsImportLabel(status: string) {
+  return { created: '已生成', exists: '已存在', duplicate: '重复', invalid: '格式错误' }[status] || status;
+}
+function smsImportTagType(status: string) {
+  return { created: 'success', exists: 'warning', duplicate: 'info', invalid: 'danger' }[status] || 'info';
+}
+
+function copyNewSmsExternals() {
+  const codes = smsImportResults.value
+    .filter((r) => r.status === 'created' && r.externalCode)
+    .map((r) => r.externalCode as string);
+  if (!codes.length) {
+    ElMessage.warning('没有新生成的兑换码');
+    return;
+  }
+  void copyText(codes.join('\n'));
+}
+
+async function handleSmsImport() {
+  const cards = Array.from(new Set(smsImportRaw.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)));
+  if (!cards.length) {
+    ElMessage.warning('请至少输入一个接码卡密');
+    return;
+  }
+  smsImporting.value = true;
+  try {
+    const r = await importSmsMappings(cards, smsImportNote.value);
+    smsImportResults.value = r.results;
+    smsImportCreated.value = r.created;
+    ElMessage.success(`导入完成，新建 ${r.created} 条`);
+    smsImportRaw.value = '';
+    await loadSmsMappings();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    smsImporting.value = false;
+  }
+}
+
+async function loadSmsMappings() {
+  smsLoading.value = true;
+  try {
+    smsMappings.value = await listSmsMappings(smsSearch.value);
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    smsLoading.value = false;
+  }
+}
+
+async function toggleSmsStatus(row: SmsMappingItem) {
+  const next = row.status === 'active' ? 'disabled' : 'active';
+  try {
+    await updateSmsMappingStatus(row.id, next);
+    row.status = next;
+    ElMessage.success('已更新');
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+async function removeSmsMapping(row: SmsMappingItem) {
+  try {
+    await ElMessageBox.confirm(`确认删除兑换码 ${row.externalCode} 的接码卡密？`, '删除确认', { type: 'warning' });
+  } catch {
+    return;
+  }
+  try {
+    await deleteSmsMapping(row.id);
+    smsMappings.value = smsMappings.value.filter((m) => m.id !== row.id);
+    ElMessage.success('已删除');
+  } catch (error) {
+    ElMessage.error((error as Error).message);
   }
 }
 

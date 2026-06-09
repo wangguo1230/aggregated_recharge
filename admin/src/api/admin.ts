@@ -110,3 +110,50 @@ export async function listOrders(q = ''): Promise<OrderItem[]> {
   });
   return unwrap(data).items || [];
 }
+
+// ===== 接码卡密映射 =====
+export interface SmsMappingItem {
+  id: number;
+  externalCode: string;
+  phone: string;
+  realCard: string;
+  status: string;
+  note: string;
+  createdAt: string;
+}
+
+export interface SmsImportResultItem {
+  phone: string;
+  externalCode?: string;
+  status: string;
+  message?: string;
+}
+
+export async function importSmsMappings(
+  realCards: string[],
+  note = '',
+): Promise<{ created: number; total: number; results: SmsImportResultItem[] }> {
+  const { data } = await api.post<BaseResult & { created: number; total: number; results: SmsImportResultItem[] }>(
+    '/sms/admin/mappings/import',
+    { realCards, note },
+  );
+  const r = unwrap(data);
+  return { created: r.created, total: r.total, results: r.results };
+}
+
+export async function listSmsMappings(q = ''): Promise<SmsMappingItem[]> {
+  const { data } = await api.get<BaseResult & { items: SmsMappingItem[] }>('/sms/admin/mappings', {
+    params: { q },
+  });
+  return unwrap(data).items || [];
+}
+
+export async function updateSmsMappingStatus(id: number, status: 'active' | 'disabled'): Promise<void> {
+  const { data } = await api.patch<BaseResult>(`/sms/admin/mappings/${id}`, { status });
+  unwrap(data);
+}
+
+export async function deleteSmsMapping(id: number): Promise<void> {
+  const { data } = await api.delete<BaseResult>(`/sms/admin/mappings/${id}`);
+  unwrap(data);
+}

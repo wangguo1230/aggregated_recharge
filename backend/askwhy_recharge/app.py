@@ -21,17 +21,21 @@ from .client import AskWhyApiError, AskWhyClient
 from .codes import generate_external_code, normalize_external_code
 from .crypto import AskWhyCryptoError, FernetSecretCipher, fingerprint
 from .db import get_db_session, init_askwhy_db
-from .models import AskWhyCardMappingModel, AskWhyOrderModel
+from .models import AskWhyCardMappingModel, AskWhyOrderModel, SmsCardMappingModel
 from .schemas import (
     CardStatusRequest,
     CreateOrderRequest,
     ImportMappingsRequest,
     MappingStatusRequest,
+    SmsFetchRequest,
+    SmsImportMappingsRequest,
+    SmsVerifyRequest,
     SubscriptionRequest,
     VerifyCardRequest,
     VerifyTokenRequest,
 )
 from .settings import AskWhySettings, load_askwhy_settings
+from .sms_client import SmsApiError, fetch_sms_text, parse_sms, split_card
 
 logger = logging.getLogger(__name__)
 
@@ -359,7 +363,7 @@ def create_app() -> FastAPI:
             except AskWhyApiError as exc:
                 verify_message = str(exc)
 
-            display, norm = _unique_external_code(session)
+            display, norm = _unique_external_code(session, AskWhyCardMappingModel, "AW")
             mapping = AskWhyCardMappingModel(
                 external_code=display,
                 external_code_norm=norm,
@@ -486,17 +490,192 @@ def create_app() -> FastAPI:
             )
         return {"ok": True, "count": len(items), "items": items}
 
+    # ==================== 接码（短信）====================
+    def resolve_sms_mapping(session: Session, external_input: str) -> SmsCardMappingModel | None:
+        norm = normalize_external_code(external_input)
+        if not norm:
+            return None
+        return (
+            session.query(SmsCardMappingModel)
+            .filter(
+                SmsCardMappingModel.external_code_norm == norm,
+                SmsCardMappingModel.status == "active",
+            )
+            .first()
+        )
+
+    @app.post("/api/sms/card/verify")
+    def sms_verify(payload: SmsVerifyRequest, session: Session = Depends(get_db_session)) -> dict:
+        mapping = resolve_sms_mapping(session, payload.card_code)
+        if mapping is None:
+            return _fail("兑换码不存在或不可用")
+        # 只回兑换码与手机号，绝不暴露查询 URL。
+        return {
+            "ok": True,
+            "card": {"code": mapping.external_code, "phone": mapping.phone},
+        }
+
+    @app.post("/api/sms/fetch")
+    def sms_fetch(payload: SmsFetchRequest, session: Session = Depends(get_db_session)) -> dict:
+        mapping = resolve_sms_mapping(session, payload.card_code)
+        if mapping is None:
+            return _fail("兑换码不存在或不可用")
+        try:
+            real_card = cipher.decrypt(mapping.real_card_encrypted)
+        except AskWhyCryptoError as exc:
+            return _fail(str(exc))
+        _, url = split_card(real_card)
+        if not url:
+            return _fail("接码卡密格式异常（缺少查询地址）")
+        try:
+            text = fetch_sms_text(
+                url,
+                proxy=settings.request_proxy,
+                timeout=settings.request_timeout_seconds,
+                retry_attempts=settings.request_retry_attempts,
+            )
+        except SmsApiError as exc:
+            return _fail(str(exc))
+        parsed = parse_sms(text)
+        return {
+            "ok": True,
+            "phone": mapping.phone,
+            "hasSms": parsed["hasSms"],
+            "code": parsed["code"],
+            "content": parsed["content"],
+        }
+
+    # ---- 接码卡密管理（复用同一管理口令）----
+    @app.post("/api/sms/admin/mappings/import", dependencies=[Depends(require_admin)])
+    def sms_import_mappings(
+        payload: SmsImportMappingsRequest, session: Session = Depends(get_db_session)
+    ) -> dict:
+        note = payload.note.strip()[:255]
+        seen_in_batch: set[str] = set()
+        results: list[dict] = []
+        for raw in payload.real_cards:
+            real = str(raw or "").strip()
+            if not real:
+                continue
+            phone, url = split_card(real)
+            if not phone or not url:
+                results.append({"phone": phone, "status": "invalid", "message": "格式应为 手机号----查询URL"})
+                continue
+
+            fp = fingerprint(real, settings.secret_key)
+            if fp in seen_in_batch:
+                results.append({"phone": phone, "status": "duplicate", "message": "本次提交内重复"})
+                continue
+            seen_in_batch.add(fp)
+
+            existing = (
+                session.query(SmsCardMappingModel)
+                .filter(SmsCardMappingModel.real_card_fingerprint == fp)
+                .first()
+            )
+            if existing is not None:
+                results.append(
+                    {
+                        "phone": phone,
+                        "externalCode": existing.external_code,
+                        "status": "exists",
+                        "message": "该接码卡密已存在映射",
+                    }
+                )
+                continue
+
+            display, norm = _unique_external_code(session, SmsCardMappingModel, "SM")
+            mapping = SmsCardMappingModel(
+                external_code=display,
+                external_code_norm=norm,
+                real_card_encrypted=cipher.encrypt(real),
+                real_card_fingerprint=fp,
+                phone=phone,
+                status="active",
+                note=note,
+            )
+            session.add(mapping)
+            session.commit()
+            results.append(
+                {"phone": phone, "externalCode": display, "status": "created", "message": "已生成"}
+            )
+        created = sum(1 for r in results if r["status"] == "created")
+        return {"ok": True, "created": created, "total": len(results), "results": results}
+
+    @app.get("/api/sms/admin/mappings", dependencies=[Depends(require_admin)])
+    def sms_list_mappings(
+        q: str = Query("", max_length=64),
+        limit: int = Query(500, ge=1, le=2000),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        query = session.query(SmsCardMappingModel)
+        keyword = q.strip()
+        if keyword:
+            norm = normalize_external_code(keyword)
+            like = f"%{keyword}%"
+            query = query.filter(
+                (SmsCardMappingModel.external_code_norm.like(f"%{norm}%"))
+                | (SmsCardMappingModel.phone.like(like))
+            )
+        rows = query.order_by(SmsCardMappingModel.id.desc()).limit(limit).all()
+        items = []
+        for row in rows:
+            try:
+                real_card = cipher.decrypt(row.real_card_encrypted)
+            except AskWhyCryptoError:
+                real_card = ""
+            items.append(
+                {
+                    "id": row.id,
+                    "externalCode": row.external_code,
+                    "phone": row.phone,
+                    "realCard": real_card,
+                    "status": row.status,
+                    "note": row.note,
+                    "createdAt": row.created_at.isoformat() if row.created_at else "",
+                }
+            )
+        return {"ok": True, "count": len(items), "items": items}
+
+    @app.patch("/api/sms/admin/mappings/{mapping_id}", dependencies=[Depends(require_admin)])
+    def sms_update_mapping(
+        payload: MappingStatusRequest,
+        mapping_id: int = Path(..., ge=1),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        row = session.get(SmsCardMappingModel, mapping_id)
+        if row is None:
+            return _fail("映射不存在")
+        row.status = payload.status
+        session.commit()
+        return {"ok": True}
+
+    @app.delete("/api/sms/admin/mappings/{mapping_id}", dependencies=[Depends(require_admin)])
+    def sms_delete_mapping(
+        mapping_id: int = Path(..., ge=1),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        row = session.get(SmsCardMappingModel, mapping_id)
+        if row is None:
+            return _fail("映射不存在")
+        session.delete(row)
+        session.commit()
+        return {"ok": True}
+
     return app
 
 
-def _unique_external_code(session: Session) -> tuple[str, str]:
-    """生成不与库中冲突的外部码（极小概率碰撞，重试若干次）。"""
+def _unique_external_code(session: Session, model, prefix: str = "AW") -> tuple[str, str]:
+    """生成不与该映射表冲突的外部码（极小概率碰撞，重试若干次）。
+
+    model 为目标映射表 ORM 类（AskWhy / SMS 各自独立），prefix 区分业务线。
+    """
 
     for _ in range(10):
-        display, norm = generate_external_code()
+        display, norm = generate_external_code(prefix)
         exists = (
-            session.query(AskWhyCardMappingModel.id)
-            .filter(AskWhyCardMappingModel.external_code_norm == norm)
+            session.query(model.id)
+            .filter(model.external_code_norm == norm)
             .first()
         )
         if exists is None:
