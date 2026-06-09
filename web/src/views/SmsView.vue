@@ -107,9 +107,7 @@
           <!-- 已收到的短信（仅有效短信，去重） -->
           <template v-for="(item, idx) in messages" :key="idx">
             <div class="step-summary">
-              <span>{{ item.time }} · {{ item.code ? `验证码 ${item.code}` : '短信' }}</span>
-              <strong v-if="item.code" class="mono sms-code-value">{{ item.code }}</strong>
-              <em class="sms-record-content">{{ item.content }}</em>
+              <span class="sms-record-content">{{ item.content }}</span>
             </div>
           </template>
 
