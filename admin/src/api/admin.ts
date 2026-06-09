@@ -57,6 +57,17 @@ export interface ImportResultItem {
   verifyOk?: boolean;
 }
 
+// 批量反查结果：外部码/兑换码 → 原始卡密。
+export interface LookupResultItem {
+  input: string;
+  found: boolean;
+  externalCode: string;
+  realCard: string;
+  phone?: string;
+  cardTypeLabel?: string;
+  status?: string;
+}
+
 interface BaseResult {
   ok: boolean;
   message?: string;
@@ -90,6 +101,14 @@ export async function listMappings(q = ''): Promise<MappingItem[]> {
     params: { q },
   });
   return unwrap(data).items || [];
+}
+
+// 批量外部码反查原始卡密。
+export async function lookupMappings(externalCodes: string[]): Promise<LookupResultItem[]> {
+  const { data } = await api.post<BaseResult & { results: LookupResultItem[] }>('/askwhy/admin/mappings/lookup', {
+    externalCodes,
+  });
+  return unwrap(data).results || [];
 }
 
 export async function updateMappingStatus(id: number, status: 'active' | 'disabled'): Promise<void> {
@@ -144,6 +163,14 @@ export async function listSmsMappings(q = ''): Promise<SmsMappingItem[]> {
     params: { q },
   });
   return unwrap(data).items || [];
+}
+
+// 批量兑换码反查接码原始卡密。
+export async function lookupSmsMappings(externalCodes: string[]): Promise<LookupResultItem[]> {
+  const { data } = await api.post<BaseResult & { results: LookupResultItem[] }>('/sms/admin/mappings/lookup', {
+    externalCodes,
+  });
+  return unwrap(data).results || [];
 }
 
 export async function updateSmsMappingStatus(id: number, status: 'active' | 'disabled'): Promise<void> {

@@ -51,6 +51,13 @@ class MappingStatusRequest(BaseModel):
     status: str = Field(..., pattern="^(active|disabled)$")
 
 
+class LookupMappingsRequest(BaseModel):
+    # 批量外部码/兑换码，反查其对应的原始卡密（卡密映射与接码卡密通用）。
+    external_codes: list[str] = Field(..., alias="externalCodes", max_length=500)
+
+    model_config = {"populate_by_name": True}
+
+
 # ---- 接码（短信）相关请求体 ----
 class SmsVerifyRequest(BaseModel):
     # 接码兑换码（外部码），校验后返回手机号。

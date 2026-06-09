@@ -26,6 +26,7 @@ from .schemas import (
     CardStatusRequest,
     CreateOrderRequest,
     ImportMappingsRequest,
+    LookupMappingsRequest,
     MappingStatusRequest,
     SmsFetchRequest,
     SmsImportMappingsRequest,
@@ -422,6 +423,45 @@ def create_app() -> FastAPI:
             )
         return {"ok": True, "count": len(items), "items": items}
 
+    @app.post("/api/askwhy/admin/mappings/lookup", dependencies=[Depends(require_admin)])
+    def lookup_mappings(payload: LookupMappingsRequest, session: Session = Depends(get_db_session)) -> dict:
+        """批量外部码反查原始卡密：保留输入顺序，按规范化外部码精确匹配，去重。"""
+
+        results: list[dict] = []
+        seen: set[str] = set()
+        for raw in payload.external_codes:
+            code = str(raw or "").strip()
+            if not code:
+                continue
+            norm = normalize_external_code(code)
+            if norm in seen:
+                continue
+            seen.add(norm)
+            row = (
+                session.query(AskWhyCardMappingModel)
+                .filter(AskWhyCardMappingModel.external_code_norm == norm)
+                .first()
+            )
+            if row is None:
+                results.append({"input": code, "found": False, "externalCode": "", "realCard": ""})
+                continue
+            try:
+                real_card = cipher.decrypt(row.real_card_encrypted)
+            except AskWhyCryptoError:
+                real_card = ""
+            results.append(
+                {
+                    "input": code,
+                    "found": True,
+                    "externalCode": row.external_code,
+                    "realCard": real_card,
+                    "cardTypeLabel": row.card_type_label,
+                    "status": row.status,
+                }
+            )
+        found = sum(1 for r in results if r["found"])
+        return {"ok": True, "found": found, "total": len(results), "results": results}
+
     @app.patch("/api/askwhy/admin/mappings/{mapping_id}", dependencies=[Depends(require_admin)])
     def update_mapping(
         payload: MappingStatusRequest,
@@ -634,6 +674,45 @@ def create_app() -> FastAPI:
                 }
             )
         return {"ok": True, "count": len(items), "items": items}
+
+    @app.post("/api/sms/admin/mappings/lookup", dependencies=[Depends(require_admin)])
+    def sms_lookup_mappings(payload: LookupMappingsRequest, session: Session = Depends(get_db_session)) -> dict:
+        """批量兑换码反查接码原始卡密（手机号----URL）：保留输入顺序，精确匹配，去重。"""
+
+        results: list[dict] = []
+        seen: set[str] = set()
+        for raw in payload.external_codes:
+            code = str(raw or "").strip()
+            if not code:
+                continue
+            norm = normalize_external_code(code)
+            if norm in seen:
+                continue
+            seen.add(norm)
+            row = (
+                session.query(SmsCardMappingModel)
+                .filter(SmsCardMappingModel.external_code_norm == norm)
+                .first()
+            )
+            if row is None:
+                results.append({"input": code, "found": False, "externalCode": "", "realCard": "", "phone": ""})
+                continue
+            try:
+                real_card = cipher.decrypt(row.real_card_encrypted)
+            except AskWhyCryptoError:
+                real_card = ""
+            results.append(
+                {
+                    "input": code,
+                    "found": True,
+                    "externalCode": row.external_code,
+                    "realCard": real_card,
+                    "phone": row.phone,
+                    "status": row.status,
+                }
+            )
+        found = sum(1 for r in results if r["found"])
+        return {"ok": True, "found": found, "total": len(results), "results": results}
 
     @app.patch("/api/sms/admin/mappings/{mapping_id}", dependencies=[Depends(require_admin)])
     def sms_update_mapping(

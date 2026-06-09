@@ -72,6 +72,45 @@
           </el-table>
         </template>
 
+        <!-- 批量反查原始卡密：粘贴外部码 → 反查 realCard，可一键复制 -->
+        <div class="admin-card__head admin-section-gap">
+          <div><p class="kicker">Lookup</p><h3>批量反查原始卡密</h3></div>
+        </div>
+        <el-form label-position="top" @submit.prevent>
+          <el-form-item label="外部码（每行一个，反查对应原始卡密，最多 500）">
+            <el-input v-model="lookupRaw" type="textarea" :rows="4" resize="vertical" placeholder="AW 开头外部码，每行一个" />
+          </el-form-item>
+          <el-button :loading="lookupLoading" type="primary" @click="handleLookup">查询并反查原始卡密</el-button>
+        </el-form>
+
+        <template v-if="lookupResults.length">
+          <div class="admin-result-bar">
+            <span>反查结果</span>
+            <strong>命中 {{ lookupFound }} / 共 {{ lookupResults.length }}</strong>
+            <el-button size="small" @click="copyLookupReals(lookupResults)">复制全部原始卡密</el-button>
+          </div>
+          <el-table :data="lookupResults" border size="small" empty-text="无结果">
+            <el-table-column label="输入外部码" min-width="150">
+              <template #default="{ row }"><span class="mono">{{ row.input }}</span></template>
+            </el-table-column>
+            <el-table-column label="原始卡密" min-width="220" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span v-if="row.found" class="mono">{{ row.realCard }}</span>
+                <el-tag v-else type="info" size="small">未找到</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="套餐" width="100">
+              <template #default="{ row }">{{ row.cardTypeLabel || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="操作" width="80">
+              <template #default="{ row }">
+                <el-button v-if="row.found" link type="primary" size="small" @click="copyText(row.realCard)">复制</el-button>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+
         <div class="admin-card__head admin-section-gap">
           <div><p class="kicker">Mappings</p><h3>映射列表</h3></div>
           <div class="admin-toolbar">
@@ -201,6 +240,45 @@
           </el-table>
         </template>
 
+        <!-- 批量反查接码原始卡密：粘贴兑换码 → 反查 手机号----URL -->
+        <div class="admin-card__head admin-section-gap">
+          <div><p class="kicker">Lookup</p><h3>批量反查原始卡密</h3></div>
+        </div>
+        <el-form label-position="top" @submit.prevent>
+          <el-form-item label="兑换码（每行一个，反查对应接码原始卡密，最多 500）">
+            <el-input v-model="smsLookupRaw" type="textarea" :rows="4" resize="vertical" placeholder="SM 开头兑换码，每行一个" />
+          </el-form-item>
+          <el-button :loading="smsLookupLoading" type="primary" @click="handleSmsLookup">查询并反查原始卡密</el-button>
+        </el-form>
+
+        <template v-if="smsLookupResults.length">
+          <div class="admin-result-bar">
+            <span>反查结果</span>
+            <strong>命中 {{ smsLookupFound }} / 共 {{ smsLookupResults.length }}</strong>
+            <el-button size="small" @click="copyLookupReals(smsLookupResults)">复制全部原始卡密</el-button>
+          </div>
+          <el-table :data="smsLookupResults" border size="small" empty-text="无结果">
+            <el-table-column label="输入兑换码" min-width="150">
+              <template #default="{ row }"><span class="mono">{{ row.input }}</span></template>
+            </el-table-column>
+            <el-table-column label="手机号" min-width="130">
+              <template #default="{ row }"><span class="mono">{{ row.phone || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column label="完整卡密（手机号----URL）" min-width="240" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span v-if="row.found" class="mono">{{ row.realCard }}</span>
+                <el-tag v-else type="info" size="small">未找到</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="80">
+              <template #default="{ row }">
+                <el-button v-if="row.found" link type="primary" size="small" @click="copyText(row.realCard)">复制</el-button>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+
         <div class="admin-card__head admin-section-gap">
           <div><p class="kicker">SMS Cards</p><h3>接码卡密列表</h3></div>
           <div class="admin-toolbar">
@@ -260,10 +338,13 @@ import {
   listMappings,
   listOrders,
   listSmsMappings,
+  lookupMappings,
+  lookupSmsMappings,
   setAdminToken,
   updateMappingStatus,
   updateSmsMappingStatus,
   type ImportResultItem,
+  type LookupResultItem,
   type MappingItem,
   type OrderItem,
   type SmsImportResultItem,
@@ -284,6 +365,18 @@ const importCreated = ref(0);
 const mappings = ref<MappingItem[]>([]);
 const loading = ref(false);
 const search = ref('');
+
+// 批量反查原始卡密（卡密映射）。
+const lookupRaw = ref('');
+const lookupLoading = ref(false);
+const lookupResults = ref<LookupResultItem[]>([]);
+const lookupFound = computed(() => lookupResults.value.filter((r) => r.found).length);
+
+// 批量反查原始卡密（接码卡密）。
+const smsLookupRaw = ref('');
+const smsLookupLoading = ref(false);
+const smsLookupResults = ref<LookupResultItem[]>([]);
+const smsLookupFound = computed(() => smsLookupResults.value.filter((r) => r.found).length);
 
 const orders = ref<OrderItem[]>([]);
 const ordersLoading = ref(false);
@@ -380,6 +473,50 @@ function copyNewExternals() {
   void copyText(codes.join('\n'));
 }
 
+// 反查结果一键复制全部原始卡密（卡密映射与接码卡密通用）。
+function copyLookupReals(results: LookupResultItem[]) {
+  const cards = results.filter((r) => r.found && r.realCard).map((r) => r.realCard);
+  if (!cards.length) {
+    ElMessage.warning('没有可复制的原始卡密');
+    return;
+  }
+  void copyText(cards.join('\n'));
+}
+
+async function handleLookup() {
+  const codes = Array.from(new Set(lookupRaw.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)));
+  if (!codes.length) {
+    ElMessage.warning('请至少输入一个外部码');
+    return;
+  }
+  lookupLoading.value = true;
+  try {
+    lookupResults.value = await lookupMappings(codes);
+    ElMessage.success(`反查完成，命中 ${lookupFound.value} / ${lookupResults.value.length}`);
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    lookupLoading.value = false;
+  }
+}
+
+async function handleSmsLookup() {
+  const codes = Array.from(new Set(smsLookupRaw.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)));
+  if (!codes.length) {
+    ElMessage.warning('请至少输入一个兑换码');
+    return;
+  }
+  smsLookupLoading.value = true;
+  try {
+    smsLookupResults.value = await lookupSmsMappings(codes);
+    ElMessage.success(`反查完成，命中 ${smsLookupFound.value} / ${smsLookupResults.value.length}`);
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    smsLookupLoading.value = false;
+  }
+}
+
 async function handleLogin() {
   if (!tokenInput.value) {
     ElMessage.warning('请输入管理员口令');
@@ -406,8 +543,10 @@ function handleLogout() {
   mappings.value = [];
   orders.value = [];
   importResults.value = [];
+  lookupResults.value = [];
   smsMappings.value = [];
   smsImportResults.value = [];
+  smsLookupResults.value = [];
 }
 
 function onTabChange() {
