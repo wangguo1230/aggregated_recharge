@@ -328,7 +328,7 @@ def create_app() -> FastAPI:
                 continue
             fp = fingerprint(real, settings.secret_key)
             if fp in seen_in_batch:
-                results.append({"realCardLast4": real[-4:], "status": "duplicate", "message": "本次提交内重复"})
+                results.append({"realCard": real, "status": "duplicate", "message": "本次提交内重复"})
                 continue
             seen_in_batch.add(fp)
 
@@ -340,7 +340,7 @@ def create_app() -> FastAPI:
             if existing is not None:
                 results.append(
                     {
-                        "realCardLast4": real[-4:],
+                        "realCard": real,
                         "externalCode": existing.external_code,
                         "typeLabel": existing.card_type_label,
                         "status": "exists",
@@ -379,7 +379,7 @@ def create_app() -> FastAPI:
             session.commit()
             results.append(
                 {
-                    "realCardLast4": real[-4:],
+                    "realCard": real,
                     "externalCode": display,
                     "typeLabel": card_type_label,
                     "status": "created",
@@ -413,7 +413,6 @@ def create_app() -> FastAPI:
                     "id": row.id,
                     "externalCode": row.external_code,
                     "realCard": real_card,
-                    "realCardLast4": row.real_card_last4,
                     "cardType": row.card_type,
                     "cardTypeLabel": row.card_type_label,
                     "status": row.status,
@@ -477,7 +476,6 @@ def create_app() -> FastAPI:
                     "orderId": row.askwhy_order_id,
                     "externalCode": row.external_code,
                     "realCard": real_card,
-                    "cardLast4": row.card_last4,
                     "cardTypeLabel": row.card_type_label,
                     "status": row.status,
                     "accountEmail": row.account_email,

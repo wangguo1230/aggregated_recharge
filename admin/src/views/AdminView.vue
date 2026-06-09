@@ -52,8 +52,8 @@
             <el-button size="small" @click="copyNewExternals">复制全部新外部码</el-button>
           </div>
           <el-table :data="importResults" border size="small" empty-text="无结果">
-            <el-table-column label="真实卡尾号" width="110">
-              <template #default="{ row }"><span class="mono">****{{ row.realCardLast4 }}</span></template>
+            <el-table-column label="真实卡密" min-width="200" show-overflow-tooltip>
+              <template #default="{ row }"><span class="mono">{{ row.realCard || '-' }}</span></template>
             </el-table-column>
             <el-table-column label="外部码" min-width="170">
               <template #default="{ row }"><span class="mono">{{ row.externalCode || '-' }}</span></template>
@@ -75,7 +75,6 @@
         <div class="admin-card__head admin-section-gap">
           <div><p class="kicker">Mappings</p><h3>映射列表</h3></div>
           <div class="admin-toolbar">
-            <el-switch v-model="revealReal" active-text="显示真实卡密" />
             <el-input v-model.trim="search" placeholder="搜外部码" style="width: 160px" clearable @keyup.enter="loadMappings" />
             <el-button :loading="loading" @click="loadMappings">刷新</el-button>
           </div>
@@ -89,7 +88,7 @@
           </el-table-column>
           <el-table-column label="真实卡密" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">
-              <span class="mono">{{ revealReal ? row.realCard : `****${row.realCardLast4}` }}</span>
+              <span class="mono">{{ row.realCard || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="套餐" width="90">
@@ -121,7 +120,6 @@
         <div class="admin-card__head" style="border: none; margin: 0 0 6px; padding: 0">
           <div><p class="kicker">Orders</p><h3>充值记录</h3></div>
           <div class="admin-toolbar">
-            <el-switch v-model="revealReal" active-text="显示真实卡密" />
             <el-input v-model.trim="orderSearch" placeholder="搜订单号/外部码/邮箱" style="width: 220px" clearable @keyup.enter="loadOrders" />
             <el-button :loading="ordersLoading" @click="loadOrders">刷新</el-button>
           </div>
@@ -135,7 +133,7 @@
           </el-table-column>
           <el-table-column label="真实卡密" min-width="190" show-overflow-tooltip>
             <template #default="{ row }">
-              <span class="mono">{{ revealReal ? row.realCard : `****${row.cardLast4}` }}</span>
+              <span class="mono">{{ row.realCard || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="套餐" width="90">
@@ -206,7 +204,6 @@
         <div class="admin-card__head admin-section-gap">
           <div><p class="kicker">SMS Cards</p><h3>接码卡密列表</h3></div>
           <div class="admin-toolbar">
-            <el-switch v-model="revealReal" active-text="显示完整卡密" />
             <el-input v-model.trim="smsSearch" placeholder="搜兑换码/手机号" style="width: 180px" clearable @keyup.enter="loadSmsMappings" />
             <el-button :loading="smsLoading" @click="loadSmsMappings">刷新</el-button>
           </div>
@@ -223,7 +220,7 @@
           </el-table-column>
           <el-table-column label="完整卡密（手机号----URL）" min-width="240" show-overflow-tooltip>
             <template #default="{ row }">
-              <span class="mono">{{ revealReal ? row.realCard : `${row.phone}----******` }}</span>
+              <span class="mono">{{ row.realCard || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="状态" width="100">
@@ -277,7 +274,6 @@ const authed = ref(false);
 const tokenInput = ref('');
 const loggingIn = ref(false);
 const activeTab = ref<'mappings' | 'orders' | 'sms'>('mappings');
-const revealReal = ref(false);
 
 const importRaw = ref('');
 const importNote = ref('');

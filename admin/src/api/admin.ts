@@ -26,7 +26,6 @@ export interface MappingItem {
   id: number;
   externalCode: string;
   realCard: string;
-  realCardLast4: string;
   cardType: string;
   cardTypeLabel: string;
   status: string;
@@ -39,7 +38,6 @@ export interface OrderItem {
   orderId: string;
   externalCode: string;
   realCard: string;
-  cardLast4: string;
   cardTypeLabel: string;
   status: string;
   accountEmail: string;
@@ -51,7 +49,7 @@ export interface OrderItem {
 }
 
 export interface ImportResultItem {
-  realCardLast4: string;
+  realCard: string;
   externalCode?: string;
   typeLabel?: string;
   status: string;
