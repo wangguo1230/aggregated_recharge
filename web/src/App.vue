@@ -57,7 +57,7 @@
                   <path d="M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z" fill="currentColor" />
                 </svg>
               </span>
-              <span class="user-rail__text"><span>Claude 充值</span><small>外部码 + uid 提交</small></span>
+              <span class="user-rail__text"><span>Claude 充值</span><small>卡密激活 Pro 会员</small></span>
             </a>
           </RouterLink>
         </nav>
@@ -95,7 +95,7 @@ const copy: Record<string, { title: string; eyebrow: string; description: string
   recharge: { title: '充值', eyebrow: 'Submit', description: '校验卡密、校验 Session，实时查看充值进度' },
   cards: { title: '卡密查询', eyebrow: 'Card Lookup', description: '批量查询卡密使用状况、充值账号与时间' },
   sms: { title: '手机接码', eyebrow: 'SMS Receive', description: '输入兑换码获取手机号，长期接收短信验证码' },
-  claude: { title: 'Claude Pro 充值', eyebrow: 'Claude Recharge', description: '输入充值卡密与 Organization ID（uid），提交激活 Claude Pro' },
+  claude: { title: 'Claude Pro 充值', eyebrow: 'Claude Recharge', description: '输入卡密与 Claude 账号 ID，提交激活 Claude Pro 会员' },
 };
 
 const current = computed(() => copy[String(route.name || '')] || copy.recharge);

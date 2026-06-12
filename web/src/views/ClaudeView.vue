@@ -27,14 +27,14 @@
         <div class="account-strip" :class="{ 'is-ready': Boolean(card) }">
           <span>商品</span>
           <strong>{{ card?.giftName || '待校验' }}</strong>
-          <em>{{ card ? '卡密可用，填写 Organization ID 提交' : '先校验外部码' }}</em>
+          <em>{{ card ? '卡密可用，填写账号 ID 即可提交' : '先校验卡密' }}</em>
         </div>
 
         <ol class="submit-steps">
           <li :class="{ active: activeStep === 0, done: Boolean(card) }">
             <span>1</span>
             <div>
-              <strong>校验外部码</strong>
+              <strong>校验卡密</strong>
               <small>{{ card ? '已获取商品信息' : '检查卡密是否可用' }}</small>
             </div>
           </li>
@@ -57,9 +57,9 @@
           <el-tag :type="stepTagType">{{ stepTagText }}</el-tag>
         </div>
 
-        <!-- Step 1: 校验外部码 -->
+        <!-- Step 1: 校验卡密 -->
         <el-form v-if="activeStep === 0" label-position="top" @submit.prevent>
-          <el-form-item label="充值卡密（外部码）">
+          <el-form-item label="充值卡密">
             <el-input v-model.trim="cardCode" placeholder="例如 CL-XXXXX-XXXXX" clearable @keyup.enter="handleVerify" />
           </el-form-item>
           <div class="action-row submit-action-row">
@@ -81,7 +81,7 @@
           </div>
 
           <el-form label-position="top" @submit.prevent>
-            <el-form-item label="Claude Organization ID（uid）">
+            <el-form-item label="Claude 账号 ID（Organization ID）">
               <el-input
                 v-model.trim="uid"
                 placeholder="请粘贴 Claude Account 页面里的 Organization ID（UUID 格式）"
@@ -163,7 +163,7 @@ const useStatusText = computed(() => {
 });
 
 const stepEyebrow = computed(() => `Step ${String(activeStep.value + 1).padStart(2, '0')}`);
-const stepTitle = computed(() => (activeStep.value === 0 ? '校验外部码' : '提交充值'));
+const stepTitle = computed(() => (activeStep.value === 0 ? '校验卡密' : '提交充值'));
 const progressValue = computed(() => {
   if (activeStep.value === 0) return card.value ? 50 : 14;
   if (succeeded.value) return 100;
@@ -187,7 +187,7 @@ const resultClass = computed(() =>
 
 async function handleVerify() {
   if (!cardCode.value) {
-    ElMessage.warning('请输入外部码');
+    ElMessage.warning('请输入卡密');
     return;
   }
   verifying.value = true;
@@ -208,7 +208,7 @@ async function handleVerify() {
 
 async function handleActivate() {
   if (!uid.value) {
-    ElMessage.warning('请输入 Organization ID（uid）');
+    ElMessage.warning('请输入 Organization ID');
     return;
   }
   activating.value = true;

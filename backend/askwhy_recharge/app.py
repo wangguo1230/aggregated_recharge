@@ -1001,7 +1001,7 @@ def create_app() -> FastAPI:
                     "externalCode": display,
                     "giftName": gift_name,
                     "status": "created",
-                    "message": check_message if not check_ok else "已生成",
+                    "message": "已生成" if check_ok else f"已生成（上游校验未通过：{check_message or '未知'}）",
                     "checkOk": check_ok,
                 }
             )
