@@ -82,10 +82,32 @@
 
           <el-form label-position="top" @submit.prevent>
             <el-form-item label="Claude Organization ID（uid）">
-              <el-input v-model.trim="uid" placeholder="例如 org_xxxxxxxxxxxxx" clearable @keyup.enter="handleActivate" />
-              <p class="claude-hint">在 Claude → Settings → Account 页面里的 Organization ID。</p>
+              <el-input
+                v-model.trim="uid"
+                placeholder="请粘贴 Claude Account 页面里的 Organization ID（UUID 格式）"
+                clearable
+                @keyup.enter="handleActivate"
+              />
             </el-form-item>
           </el-form>
+
+          <!-- 如何获取 Organization ID 引导 -->
+          <div class="claude-guide">
+            <div class="claude-guide__head">
+              <strong>如何获取 Organization ID（UID）</strong>
+              <a
+                class="claude-guide__btn"
+                href="https://claude.ai/new#settings/account"
+                target="_blank"
+                rel="noopener noreferrer"
+              >打开 Claude Account 页面 ↗</a>
+            </div>
+            <ol class="claude-guide__steps">
+              <li>点上方按钮打开 <b>Claude Account</b> 页面（claude.ai/new#settings/account）。</li>
+              <li>页面左侧点击 <b>Account</b>，在面板里找到 <b>Organization ID</b>，即你的账号 UID（一串 UUID）。</li>
+              <li>复制这串 UID 粘贴到上面的输入框，确认无误后点「提交充值」。</li>
+            </ol>
+          </div>
 
           <!-- 结果提示 -->
           <div v-if="resultMessage" class="step-summary" :class="resultClass">
@@ -242,10 +264,46 @@ function resetAll() {
 </script>
 
 <style scoped>
-.claude-hint {
-  margin: 6px 0 0;
+.claude-guide {
+  margin: 4px 0 8px;
+  padding: 14px 16px;
+  border: 1px solid rgba(40, 103, 122, 0.18);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbfc, #f1f7fb);
+}
+.claude-guide__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.claude-guide__head strong {
+  font-size: 13px;
+  color: var(--recharge-blue);
+}
+.claude-guide__btn {
   font-size: 12px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--recharge-blue);
+  padding: 6px 12px;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.claude-guide__btn:hover {
+  opacity: 0.9;
+}
+.claude-guide__steps {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 12.5px;
+  line-height: 1.7;
   color: var(--recharge-muted);
+}
+.claude-guide__steps b {
+  color: var(--recharge-ink, #1f2d3d);
 }
 .step-summary.is-success strong {
   color: var(--recharge-green);
