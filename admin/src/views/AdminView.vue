@@ -135,19 +135,22 @@
           </el-table-column>
           <el-table-column label="状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
-                {{ row.status === 'active' ? '启用' : '停用' }}
+              <el-tag :type="mappingStatusType(row.status)" size="small">
+                {{ mappingStatusLabel(row.status) }}
               </el-tag>
             </template>
           </el-table-column>
           <el-table-column label="备注" min-width="110" show-overflow-tooltip>
             <template #default="{ row }">{{ row.note || '-' }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="150">
+          <el-table-column label="操作" width="200">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="toggleStatus(row)">
-                {{ row.status === 'active' ? '停用' : '启用' }}
-              </el-button>
+              <template v-if="row.status !== 'reissued'">
+                <el-button link type="primary" size="small" @click="toggleStatus(row)">
+                  {{ row.status === 'active' ? '停用' : '启用' }}
+                </el-button>
+                <el-button link type="warning" size="small" @click="reissueMappingRow(row)">重新生成</el-button>
+              </template>
               <el-button link type="danger" size="small" @click="removeMapping(row)">删除</el-button>
             </template>
           </el-table-column>
@@ -303,19 +306,22 @@
           </el-table-column>
           <el-table-column label="状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
-                {{ row.status === 'active' ? '启用' : '停用' }}
+              <el-tag :type="mappingStatusType(row.status)" size="small">
+                {{ mappingStatusLabel(row.status) }}
               </el-tag>
             </template>
           </el-table-column>
           <el-table-column label="备注" min-width="110" show-overflow-tooltip>
             <template #default="{ row }">{{ row.note || '-' }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="150">
+          <el-table-column label="操作" width="200">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="toggleSmsStatus(row)">
-                {{ row.status === 'active' ? '停用' : '启用' }}
-              </el-button>
+              <template v-if="row.status !== 'reissued'">
+                <el-button link type="primary" size="small" @click="toggleSmsStatus(row)">
+                  {{ row.status === 'active' ? '停用' : '启用' }}
+                </el-button>
+                <el-button link type="warning" size="small" @click="reissueSmsMappingRow(row)">重新生成</el-button>
+              </template>
               <el-button link type="danger" size="small" @click="removeSmsMapping(row)">删除</el-button>
             </template>
           </el-table-column>
@@ -340,6 +346,8 @@ import {
   listSmsMappings,
   lookupMappings,
   lookupSmsMappings,
+  reissueMapping,
+  reissueSmsMapping,
   setAdminToken,
   updateMappingStatus,
   updateSmsMappingStatus,
@@ -619,6 +627,26 @@ async function toggleSmsStatus(row: SmsMappingItem) {
   }
 }
 
+async function reissueSmsMappingRow(row: SmsMappingItem) {
+  try {
+    await ElMessageBox.confirm(
+      `确认为兑换码 ${row.externalCode} 重新生成新码？旧码将立即失效，新码指向同一张接码卡密。`,
+      '重新生成确认',
+      { type: 'warning', confirmButtonText: '确认生成' },
+    );
+  } catch {
+    return;
+  }
+  try {
+    const next = await reissueSmsMapping(row.id);
+    await loadSmsMappings();
+    ElMessage.success(next ? `已生成新兑换码 ${next}` : '已重新生成');
+    if (next) void copyText(next);
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
 async function removeSmsMapping(row: SmsMappingItem) {
   try {
     await ElMessageBox.confirm(`确认删除兑换码 ${row.externalCode} 的接码卡密？`, '删除确认', { type: 'warning' });
@@ -683,6 +711,34 @@ async function toggleStatus(row: MappingItem) {
     await updateMappingStatus(row.id, next);
     row.status = next;
     ElMessage.success('已更新');
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+// 卡密映射 / 接码卡密通用的状态展示（active 启用 / disabled 停用 / reissued 已重发失效）。
+function mappingStatusLabel(status: string) {
+  return { active: '启用', disabled: '停用', reissued: '已重发' }[status] || status;
+}
+function mappingStatusType(status: string) {
+  return { active: 'success', disabled: 'info', reissued: 'info' }[status] || 'info';
+}
+
+async function reissueMappingRow(row: MappingItem) {
+  try {
+    await ElMessageBox.confirm(
+      `确认为外部码 ${row.externalCode} 重新生成新码？旧码将立即失效，新码指向同一张真实卡密。`,
+      '重新生成确认',
+      { type: 'warning', confirmButtonText: '确认生成' },
+    );
+  } catch {
+    return;
+  }
+  try {
+    const next = await reissueMapping(row.id);
+    await loadMappings();
+    ElMessage.success(next ? `已生成新外部码 ${next}` : '已重新生成');
+    if (next) void copyText(next);
   } catch (error) {
     ElMessage.error((error as Error).message);
   }

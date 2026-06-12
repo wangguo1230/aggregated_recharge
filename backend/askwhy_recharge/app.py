@@ -471,9 +471,44 @@ def create_app() -> FastAPI:
         row = session.get(AskWhyCardMappingModel, mapping_id)
         if row is None:
             return _fail("映射不存在")
+        # 已重发的旧外部码为失效终态，不允许再改状态（防止被复活）。
+        if row.status == "reissued":
+            return _fail("该外部码已重发并失效，不可再变更状态")
         row.status = payload.status
         session.commit()
         return {"ok": True}
+
+    @app.post("/api/askwhy/admin/mappings/{mapping_id}/reissue", dependencies=[Depends(require_admin)])
+    def reissue_mapping(
+        mapping_id: int = Path(..., ge=1),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        """重新生成外部码：旧码置为 reissued 失效，新建一条指向同一真实卡密的 active 记录。
+
+        真实卡密、指纹、套餐信息原样复制：客户拿到的新码可用、旧码自动失效
+        （resolve 仅认 active），适用于旧码泄露 / 需重发的换码场景。
+        """
+        old = session.get(AskWhyCardMappingModel, mapping_id)
+        if old is None:
+            return _fail("映射不存在")
+        if old.status == "reissued":
+            return _fail("该外部码已重发，请对最新的外部码操作")
+        display, norm = _unique_external_code(session, AskWhyCardMappingModel, "AW")
+        fresh = AskWhyCardMappingModel(
+            external_code=display,
+            external_code_norm=norm,
+            real_card_encrypted=old.real_card_encrypted,
+            real_card_fingerprint=old.real_card_fingerprint,
+            real_card_last4=old.real_card_last4,
+            card_type=old.card_type,
+            card_type_label=old.card_type_label,
+            status="active",
+            note=old.note,
+        )
+        old.status = "reissued"
+        session.add(fresh)
+        session.commit()
+        return {"ok": True, "externalCode": display}
 
     @app.delete("/api/askwhy/admin/mappings/{mapping_id}", dependencies=[Depends(require_admin)])
     def delete_mapping(
@@ -723,9 +758,38 @@ def create_app() -> FastAPI:
         row = session.get(SmsCardMappingModel, mapping_id)
         if row is None:
             return _fail("映射不存在")
+        # 已重发的旧兑换码为失效终态，不允许再改状态（防止被复活）。
+        if row.status == "reissued":
+            return _fail("该兑换码已重发并失效，不可再变更状态")
         row.status = payload.status
         session.commit()
         return {"ok": True}
+
+    @app.post("/api/sms/admin/mappings/{mapping_id}/reissue", dependencies=[Depends(require_admin)])
+    def sms_reissue_mapping(
+        mapping_id: int = Path(..., ge=1),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        """重新生成兑换码：旧码置为 reissued 失效，新建一条指向同一接码卡密的 active 记录。"""
+        old = session.get(SmsCardMappingModel, mapping_id)
+        if old is None:
+            return _fail("映射不存在")
+        if old.status == "reissued":
+            return _fail("该兑换码已重发，请对最新的兑换码操作")
+        display, norm = _unique_external_code(session, SmsCardMappingModel, "SM")
+        fresh = SmsCardMappingModel(
+            external_code=display,
+            external_code_norm=norm,
+            real_card_encrypted=old.real_card_encrypted,
+            real_card_fingerprint=old.real_card_fingerprint,
+            phone=old.phone,
+            status="active",
+            note=old.note,
+        )
+        old.status = "reissued"
+        session.add(fresh)
+        session.commit()
+        return {"ok": True, "externalCode": display}
 
     @app.delete("/api/sms/admin/mappings/{mapping_id}", dependencies=[Depends(require_admin)])
     def sms_delete_mapping(

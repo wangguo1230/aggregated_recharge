@@ -116,6 +116,12 @@ export async function updateMappingStatus(id: number, status: 'active' | 'disabl
   unwrap(data);
 }
 
+// 重新生成外部码：旧码失效，新建指向同一真实卡密的新外部码，返回新码。
+export async function reissueMapping(id: number): Promise<string> {
+  const { data } = await api.post<BaseResult & { externalCode?: string }>(`/askwhy/admin/mappings/${id}/reissue`, {});
+  return unwrap(data).externalCode || '';
+}
+
 export async function deleteMapping(id: number): Promise<void> {
   const { data } = await api.delete<BaseResult>(`/askwhy/admin/mappings/${id}`);
   unwrap(data);
@@ -176,6 +182,12 @@ export async function lookupSmsMappings(externalCodes: string[]): Promise<Lookup
 export async function updateSmsMappingStatus(id: number, status: 'active' | 'disabled'): Promise<void> {
   const { data } = await api.patch<BaseResult>(`/sms/admin/mappings/${id}`, { status });
   unwrap(data);
+}
+
+// 重新生成兑换码：旧码失效，新建指向同一接码卡密的新兑换码，返回新码。
+export async function reissueSmsMapping(id: number): Promise<string> {
+  const { data } = await api.post<BaseResult & { externalCode?: string }>(`/sms/admin/mappings/${id}/reissue`, {});
+  return unwrap(data).externalCode || '';
 }
 
 export async function deleteSmsMapping(id: number): Promise<void> {
