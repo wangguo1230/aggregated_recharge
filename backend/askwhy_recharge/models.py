@@ -103,3 +103,63 @@ class SmsCardMappingModel(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
     )
+
+
+class ClaudeCardMappingModel(Base):
+    """外部码 ↔ 真实 Gift cdkey 映射（Claude Pro 充值，真实 cdkey 加密存储）。"""
+
+    __tablename__ = "claude_card_mappings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # 对客户暴露的外部码：display 带分隔符（前缀 CL），norm 为归一化唯一键。
+    external_code: Mapped[str] = mapped_column(String(64), default="")
+    external_code_norm: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+
+    # 真实 Gift cdkey：加密存储，fingerprint 用于去重（避免同一真实卡重复映射）。
+    real_card_encrypted: Mapped[str] = mapped_column(Text, default="")
+    real_card_fingerprint: Mapped[str] = mapped_column(String(80), default="", index=True)
+    real_card_last4: Mapped[str] = mapped_column(String(8), default="")
+
+    # 录入时 check 得到的商品信息（仅管理端展示）。
+    gift_name: Mapped[str] = mapped_column(String(80), default="")
+    app: Mapped[str] = mapped_column(String(20), default="claude")
+
+    status: Mapped[str] = mapped_column(String(20), default="active", index=True)
+    note: Mapped[str] = mapped_column(String(255), default="")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ClaudeOrderModel(Base):
+    """Claude Pro 充值记录：真实 cdkey 加密存储，记录客户提交的 uid、状态与结果，便于对账与售后。"""
+
+    __tablename__ = "claude_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # 敏感字段：真实 cdkey 加密存储；fingerprint 供检索。
+    card_code_encrypted: Mapped[str] = mapped_column(Text, default="")
+    card_fingerprint: Mapped[str] = mapped_column(String(80), default="", index=True)
+    card_last4: Mapped[str] = mapped_column(String(8), default="")
+
+    # 提交时使用的外部码、客户提交的 Claude Organization ID（uid，明文供展示/检索）。
+    external_code: Mapped[str] = mapped_column(String(64), default="", index=True)
+    uid: Mapped[str] = mapped_column(String(120), default="", index=True)
+
+    gift_name: Mapped[str] = mapped_column(String(80), default="")
+    # use_status：0待提交 / -1处理中 / 1已完成 / -9库存不足 / -999异常 / -1000已作废 / -1001售后
+    use_status: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="PENDING", index=True)
+    result_message: Mapped[str] = mapped_column(Text, default="")
+    account: Mapped[str] = mapped_column(String(255), default="")
+    completed_at: Mapped[str] = mapped_column(String(40), default="")
+    submit_ip: Mapped[str] = mapped_column(String(80), default="")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )

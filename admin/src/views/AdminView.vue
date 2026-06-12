@@ -24,6 +24,7 @@
           <el-tab-pane label="卡密映射" name="mappings" />
           <el-tab-pane label="充值记录" name="orders" />
           <el-tab-pane label="接码卡密" name="sms" />
+          <el-tab-pane label="Claude卡密" name="claude" />
         </el-tabs>
         <div class="admin-toolbar">
           <span style="font-size: 13px; color: var(--recharge-muted)">
@@ -202,7 +203,7 @@
       </template>
 
       <!-- ===== 接码卡密 ===== -->
-      <template v-else>
+      <template v-else-if="activeTab === 'sms'">
         <el-form label-position="top" @submit.prevent>
           <el-form-item label="接码卡密（每行一个，格式 手机号----查询URL，最多 500）">
             <el-input
@@ -327,6 +328,160 @@
           </el-table-column>
         </el-table>
       </template>
+
+      <!-- ===== Claude 卡密 ===== -->
+      <template v-else>
+        <el-form label-position="top" @submit.prevent>
+          <el-form-item label="Claude cdkey（每行一个，最多 500）">
+            <el-input
+              v-model="claudeImportRaw"
+              type="textarea"
+              :rows="4"
+              resize="vertical"
+              placeholder="XXXXX-XXXXX-XXXXX"
+            />
+          </el-form-item>
+          <el-form-item label="备注（可选）">
+            <el-input v-model.trim="claudeImportNote" maxlength="255" placeholder="例如 批次/来源" style="max-width: 360px" />
+          </el-form-item>
+          <el-button :loading="claudeImporting" type="primary" @click="handleClaudeImport">导入并生成外部码</el-button>
+        </el-form>
+
+        <template v-if="claudeImportResults.length">
+          <div class="admin-result-bar">
+            <span>导入结果</span>
+            <strong>新建 {{ claudeImportCreated }} / 共 {{ claudeImportResults.length }}</strong>
+            <el-button size="small" @click="copyNewClaudeExternals">复制全部新外部码</el-button>
+          </div>
+          <el-table :data="claudeImportResults" border size="small" empty-text="无结果">
+            <el-table-column label="cdkey" min-width="200" show-overflow-tooltip>
+              <template #default="{ row }"><span class="mono">{{ row.realCard || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column label="外部码" min-width="170">
+              <template #default="{ row }"><span class="mono">{{ row.externalCode || '-' }}</span></template>
+            </el-table-column>
+            <el-table-column label="商品" width="120">
+              <template #default="{ row }">{{ row.giftName || '-' }}</template>
+            </el-table-column>
+            <el-table-column label="结果" width="90">
+              <template #default="{ row }">
+                <el-tag :type="claudeImportTagType(row.status)" size="small">{{ claudeImportLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="说明" min-width="150" show-overflow-tooltip>
+              <template #default="{ row }">{{ row.message || '-' }}</template>
+            </el-table-column>
+          </el-table>
+        </template>
+
+        <!-- 批量反查原始 cdkey -->
+        <div class="admin-card__head admin-section-gap">
+          <div><p class="kicker">Lookup</p><h3>批量反查原始卡密</h3></div>
+        </div>
+        <el-form label-position="top" @submit.prevent>
+          <el-form-item label="外部码（每行一个，反查对应原始 cdkey，最多 500）">
+            <el-input v-model="claudeLookupRaw" type="textarea" :rows="4" resize="vertical" placeholder="CL 开头外部码，每行一个" />
+          </el-form-item>
+          <el-button :loading="claudeLookupLoading" type="primary" @click="handleClaudeLookup">查询并反查原始卡密</el-button>
+        </el-form>
+
+        <template v-if="claudeLookupResults.length">
+          <div class="admin-result-bar">
+            <span>反查结果</span>
+            <strong>命中 {{ claudeLookupFound }} / 共 {{ claudeLookupResults.length }}</strong>
+            <el-button size="small" @click="copyLookupReals(claudeLookupResults)">复制全部原始卡密</el-button>
+          </div>
+          <el-table :data="claudeLookupResults" border size="small" empty-text="无结果">
+            <el-table-column label="输入外部码" min-width="150">
+              <template #default="{ row }"><span class="mono">{{ row.input }}</span></template>
+            </el-table-column>
+            <el-table-column label="原始 cdkey" min-width="220" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span v-if="row.found" class="mono">{{ row.realCard }}</span>
+                <el-tag v-else type="info" size="small">未找到</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="80">
+              <template #default="{ row }">
+                <el-button v-if="row.found" link type="primary" size="small" @click="copyText(row.realCard)">复制</el-button>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+
+        <div class="admin-card__head admin-section-gap">
+          <div><p class="kicker">Claude Cards</p><h3>Claude 卡密列表</h3></div>
+          <div class="admin-toolbar">
+            <el-input v-model.trim="claudeSearch" placeholder="搜外部码" style="width: 160px" clearable @keyup.enter="loadClaudeMappings" />
+            <el-button :loading="claudeLoading" @click="loadClaudeMappings">刷新</el-button>
+          </div>
+        </div>
+        <el-table v-loading="claudeLoading" :data="claudeMappings" border empty-text="暂无 Claude 卡密">
+          <el-table-column label="外部码" min-width="170">
+            <template #default="{ row }">
+              <span class="mono">{{ row.externalCode }}</span>
+              <el-button link type="primary" size="small" @click="copyText(row.externalCode)">复制</el-button>
+            </template>
+          </el-table-column>
+          <el-table-column label="原始 cdkey" min-width="200" show-overflow-tooltip>
+            <template #default="{ row }"><span class="mono">{{ row.realCard || '-' }}</span></template>
+          </el-table-column>
+          <el-table-column label="商品" width="120">
+            <template #default="{ row }">{{ row.giftName || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="mappingStatusType(row.status)" size="small">{{ mappingStatusLabel(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="110" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.note || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="200">
+            <template #default="{ row }">
+              <template v-if="row.status !== 'reissued'">
+                <el-button link type="primary" size="small" @click="toggleClaudeStatus(row)">
+                  {{ row.status === 'active' ? '停用' : '启用' }}
+                </el-button>
+                <el-button link type="warning" size="small" @click="reissueClaudeMappingRow(row)">重新生成</el-button>
+              </template>
+              <el-button link type="danger" size="small" @click="removeClaudeMapping(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <!-- Claude 充值记录 -->
+        <div class="admin-card__head admin-section-gap">
+          <div><p class="kicker">Orders</p><h3>Claude 充值记录</h3></div>
+          <div class="admin-toolbar">
+            <el-input v-model.trim="claudeOrderSearch" placeholder="搜外部码/uid/账号" style="width: 200px" clearable @keyup.enter="loadClaudeOrders" />
+            <el-button :loading="claudeOrdersLoading" @click="loadClaudeOrders">刷新</el-button>
+          </div>
+        </div>
+        <el-table v-loading="claudeOrdersLoading" :data="claudeOrders" border empty-text="暂无充值记录">
+          <el-table-column label="外部码" min-width="150">
+            <template #default="{ row }"><span class="mono">{{ row.externalCode || '-' }}</span></template>
+          </el-table-column>
+          <el-table-column label="uid" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }"><span class="mono">{{ row.uid || '-' }}</span></template>
+          </el-table-column>
+          <el-table-column label="商品" width="110">
+            <template #default="{ row }">{{ row.giftName || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="claudeOrderTagType(row.status)" size="small">{{ claudeOrderLabel(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="结果" min-width="150" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.resultMessage || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="提交时间" min-width="160">
+            <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+          </el-table-column>
+        </el-table>
+      </template>
     </div>
   </template>
 </template>
@@ -351,18 +506,28 @@ import {
   setAdminToken,
   updateMappingStatus,
   updateSmsMappingStatus,
+  importClaudeMappings,
+  listClaudeMappings,
+  lookupClaudeMappings,
+  updateClaudeMappingStatus,
+  reissueClaudeMapping,
+  deleteClaudeMapping,
+  listClaudeOrders,
   type ImportResultItem,
   type LookupResultItem,
   type MappingItem,
   type OrderItem,
   type SmsImportResultItem,
   type SmsMappingItem,
+  type ClaudeImportResultItem,
+  type ClaudeMappingItem,
+  type ClaudeOrderItem,
 } from '../api/admin';
 
 const authed = ref(false);
 const tokenInput = ref('');
 const loggingIn = ref(false);
-const activeTab = ref<'mappings' | 'orders' | 'sms'>('mappings');
+const activeTab = ref<'mappings' | 'orders' | 'sms' | 'claude'>('mappings');
 
 const importRaw = ref('');
 const importNote = ref('');
@@ -399,9 +564,27 @@ const smsMappings = ref<SmsMappingItem[]>([]);
 const smsLoading = ref(false);
 const smsSearch = ref('');
 
+// Claude Pro 卡密
+const claudeImportRaw = ref('');
+const claudeImportNote = ref('');
+const claudeImporting = ref(false);
+const claudeImportResults = ref<ClaudeImportResultItem[]>([]);
+const claudeImportCreated = ref(0);
+const claudeMappings = ref<ClaudeMappingItem[]>([]);
+const claudeLoading = ref(false);
+const claudeSearch = ref('');
+const claudeLookupRaw = ref('');
+const claudeLookupLoading = ref(false);
+const claudeLookupResults = ref<LookupResultItem[]>([]);
+const claudeLookupFound = computed(() => claudeLookupResults.value.filter((r) => r.found).length);
+const claudeOrders = ref<ClaudeOrderItem[]>([]);
+const claudeOrdersLoading = ref(false);
+const claudeOrderSearch = ref('');
+
 const tabCountLabel = computed(() => {
   if (activeTab.value === 'orders') return `记录 ${orders.value.length}`;
   if (activeTab.value === 'sms') return `接码卡密 ${smsMappings.value.length}`;
+  if (activeTab.value === 'claude') return `Claude ${claudeMappings.value.length}`;
   return `映射 ${mappings.value.length}`;
 });
 
@@ -563,6 +746,156 @@ function onTabChange() {
   }
   if (activeTab.value === 'sms' && !smsMappings.value.length) {
     void loadSmsMappings();
+  }
+  if (activeTab.value === 'claude' && !claudeMappings.value.length) {
+    void loadClaudeMappings();
+    void loadClaudeOrders();
+  }
+}
+
+// ===== Claude Pro 卡密管理 =====
+function claudeImportLabel(status: string) {
+  return { created: '已生成', exists: '已存在', duplicate: '重复' }[status] || status;
+}
+function claudeImportTagType(status: string) {
+  return { created: 'success', exists: 'warning', duplicate: 'info' }[status] || 'info';
+}
+const CLAUDE_USE_STATUS: Record<number, string> = {
+  0: '待提交',
+  [-1]: '处理中',
+  1: '已完成',
+  [-9]: '库存不足',
+  [-999]: '异常',
+  [-1000]: '已作废',
+  [-1001]: '售后处理',
+};
+function claudeUseStatusLabel(useStatus: number) {
+  return CLAUDE_USE_STATUS[useStatus] ?? String(useStatus ?? '-');
+}
+function claudeOrderTagType(status: string) {
+  if (status === 'SUCCEEDED') return 'success';
+  if (status === 'FAILED') return 'danger';
+  if (status === 'PROCESSING') return 'warning';
+  return 'info';
+}
+function claudeOrderLabel(status: string) {
+  return { SUCCEEDED: '充值成功', PROCESSING: '处理中', FAILED: '失败', PENDING: '待处理' }[status] || status;
+}
+
+function copyNewClaudeExternals() {
+  const codes = claudeImportResults.value
+    .filter((r) => r.status === 'created' && r.externalCode)
+    .map((r) => r.externalCode as string);
+  if (!codes.length) {
+    ElMessage.warning('没有新生成的外部码');
+    return;
+  }
+  void copyText(codes.join('\n'));
+}
+
+async function handleClaudeImport() {
+  const cards = Array.from(new Set(claudeImportRaw.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)));
+  if (!cards.length) {
+    ElMessage.warning('请至少输入一个 cdkey');
+    return;
+  }
+  claudeImporting.value = true;
+  try {
+    const r = await importClaudeMappings(cards, claudeImportNote.value);
+    claudeImportResults.value = r.results;
+    claudeImportCreated.value = r.created;
+    ElMessage.success(`导入完成，新建 ${r.created} 条`);
+    claudeImportRaw.value = '';
+    await loadClaudeMappings();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    claudeImporting.value = false;
+  }
+}
+
+async function handleClaudeLookup() {
+  const codes = Array.from(new Set(claudeLookupRaw.value.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)));
+  if (!codes.length) {
+    ElMessage.warning('请至少输入一个外部码');
+    return;
+  }
+  claudeLookupLoading.value = true;
+  try {
+    claudeLookupResults.value = await lookupClaudeMappings(codes);
+    ElMessage.success(`反查完成，命中 ${claudeLookupFound.value} / ${claudeLookupResults.value.length}`);
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    claudeLookupLoading.value = false;
+  }
+}
+
+async function loadClaudeMappings() {
+  claudeLoading.value = true;
+  try {
+    claudeMappings.value = await listClaudeMappings(claudeSearch.value);
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    claudeLoading.value = false;
+  }
+}
+
+async function toggleClaudeStatus(row: ClaudeMappingItem) {
+  const next = row.status === 'active' ? 'disabled' : 'active';
+  try {
+    await updateClaudeMappingStatus(row.id, next);
+    row.status = next;
+    ElMessage.success('已更新');
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+async function reissueClaudeMappingRow(row: ClaudeMappingItem) {
+  try {
+    await ElMessageBox.confirm(
+      `确认为外部码 ${row.externalCode} 重新生成新码？旧码将立即失效，新码指向同一张真实 cdkey。`,
+      '重新生成确认',
+      { type: 'warning', confirmButtonText: '确认生成' },
+    );
+  } catch {
+    return;
+  }
+  try {
+    const next = await reissueClaudeMapping(row.id);
+    await loadClaudeMappings();
+    ElMessage.success(next ? `已生成新外部码 ${next}` : '已重新生成');
+    if (next) void copyText(next);
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+async function removeClaudeMapping(row: ClaudeMappingItem) {
+  try {
+    await ElMessageBox.confirm(`确认删除外部码 ${row.externalCode} 的映射？`, '删除确认', { type: 'warning' });
+  } catch {
+    return;
+  }
+  try {
+    await deleteClaudeMapping(row.id);
+    claudeMappings.value = claudeMappings.value.filter((m) => m.id !== row.id);
+    ElMessage.success('已删除');
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  }
+}
+
+async function loadClaudeOrders() {
+  claudeOrdersLoading.value = true;
+  try {
+    claudeOrders.value = await listClaudeOrders(claudeOrderSearch.value);
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    claudeOrdersLoading.value = false;
   }
 }
 

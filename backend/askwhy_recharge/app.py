@@ -21,9 +21,17 @@ from .client import AskWhyApiError, AskWhyClient
 from .codes import generate_external_code, normalize_external_code
 from .crypto import AskWhyCryptoError, FernetSecretCipher, fingerprint
 from .db import get_db_session, init_askwhy_db
-from .models import AskWhyCardMappingModel, AskWhyOrderModel, SmsCardMappingModel
+from .gift_client import GiftApiError, GiftClient
+from .models import (
+    AskWhyCardMappingModel,
+    AskWhyOrderModel,
+    ClaudeCardMappingModel,
+    ClaudeOrderModel,
+    SmsCardMappingModel,
+)
 from .schemas import (
     CardStatusRequest,
+    ClaudeActivateRequest,
     CreateOrderRequest,
     ImportMappingsRequest,
     LookupMappingsRequest,
@@ -45,6 +53,16 @@ def _client(settings: AskWhySettings) -> AskWhyClient:
     return AskWhyClient(
         base_url=settings.askwhy_base_url,
         api_prefix=settings.askwhy_api_prefix,
+        proxy=settings.request_proxy,
+        timeout=settings.request_timeout_seconds,
+        retry_attempts=settings.request_retry_attempts,
+    )
+
+
+def _gift_client(settings: AskWhySettings) -> GiftClient:
+    return GiftClient(
+        base_url=settings.gift_base_url,
+        api_prefix=settings.gift_api_prefix,
         proxy=settings.request_proxy,
         timeout=settings.request_timeout_seconds,
         retry_attempts=settings.request_retry_attempts,
@@ -77,6 +95,7 @@ def create_app() -> FastAPI:
 
     cipher = FernetSecretCipher(settings.secret_key)
     client = _client(settings)
+    gift_client = _gift_client(settings)
 
     # ---- 鉴权 ----
     def require_admin(authorization: str = Header("")) -> None:
@@ -802,6 +821,358 @@ def create_app() -> FastAPI:
         session.delete(row)
         session.commit()
         return {"ok": True}
+
+    # ==================== Claude Pro 充值（Gift 上游）====================
+    def resolve_claude_mapping(session: Session, external_input: str) -> ClaudeCardMappingModel | None:
+        norm = normalize_external_code(external_input)
+        if not norm:
+            return None
+        return (
+            session.query(ClaudeCardMappingModel)
+            .filter(
+                ClaudeCardMappingModel.external_code_norm == norm,
+                ClaudeCardMappingModel.status == "active",
+            )
+            .first()
+        )
+
+    @app.post("/api/claude/card/verify")
+    def claude_verify(payload: VerifyCardRequest, session: Session = Depends(get_db_session)) -> dict:
+        """外部码查卡：解析成真实 cdkey 调上游 check，回包剥离真实卡（用外部码替换）。"""
+        mapping = resolve_claude_mapping(session, payload.card_code)
+        if mapping is None:
+            return _fail("卡密不存在或不可用")
+        try:
+            result = gift_client.check(cipher.decrypt(mapping.real_card_encrypted))
+        except (GiftApiError, AskWhyCryptoError) as exc:
+            return _fail(str(exc))
+        if not result.get("success"):
+            return _fail(str(result.get("msg") or "卡密不可用"))
+        data = result.get("data") if isinstance(result.get("data"), dict) else {}
+        return {
+            "ok": True,
+            "message": str(result.get("msg") or ""),
+            "card": {
+                "code": mapping.external_code,
+                "giftName": str(data.get("gift_name") or mapping.gift_name or ""),
+                "app": str(data.get("app") or mapping.app or "claude"),
+                "useStatus": data.get("use_status"),
+                "statusHint": str(data.get("status_hint") or ""),
+                "account": str(data.get("account") or ""),
+                "completedAt": str(data.get("completed_at") or ""),
+                "inCooldown": bool(data.get("in_cooldown", False)),
+                "cooldownRemaining": data.get("cooldown_remaining") or 0,
+            },
+        }
+
+    @app.post("/api/claude/activate")
+    def claude_activate(
+        payload: ClaudeActivateRequest,
+        request: Request,
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        """外部码 + uid 提交激活：解析真实 cdkey 调上游 activate，落库订单，回包剥离真实卡。"""
+        uid = payload.uid.strip()
+        mapping = resolve_claude_mapping(session, payload.card_code)
+        if mapping is None:
+            return _fail("卡密不存在或不可用")
+        try:
+            real_cdkey = cipher.decrypt(mapping.real_card_encrypted)
+        except AskWhyCryptoError as exc:
+            return _fail(str(exc))
+        try:
+            result = gift_client.activate(real_cdkey, uid)
+        except GiftApiError as exc:
+            return _fail(str(exc))
+
+        success = bool(result.get("success"))
+        data = result.get("data") if isinstance(result.get("data"), dict) else {}
+        use_status = data.get("use_status")
+        if success and use_status == 1:
+            status = "SUCCEEDED"
+        elif use_status == -1:
+            status = "PROCESSING"
+        elif not success:
+            status = "FAILED"
+        else:
+            status = "PENDING"
+
+        # 按外部码 upsert 订单，避免同一卡密重复提交产生多行。
+        order = (
+            session.query(ClaudeOrderModel)
+            .filter(ClaudeOrderModel.external_code == mapping.external_code)
+            .order_by(ClaudeOrderModel.id.desc())
+            .first()
+        )
+        if order is None:
+            order = ClaudeOrderModel(
+                external_code=mapping.external_code,
+                card_code_encrypted=mapping.real_card_encrypted,
+                card_fingerprint=mapping.real_card_fingerprint,
+                card_last4=mapping.real_card_last4,
+            )
+            session.add(order)
+        order.uid = uid
+        order.gift_name = str(data.get("gift_name") or mapping.gift_name or "")
+        order.use_status = int(use_status) if isinstance(use_status, (int, float)) else order.use_status
+        order.status = status
+        order.result_message = str(result.get("msg") or "")
+        order.account = str(data.get("account") or "")
+        order.completed_at = str(data.get("completed_at") or "")
+        order.submit_ip = _client_ip(request)
+        session.commit()
+
+        return {
+            "ok": success,
+            "message": str(result.get("msg") or ""),
+            "order": {
+                "externalCode": mapping.external_code,
+                "giftName": order.gift_name,
+                "useStatus": use_status,
+                "account": order.account,
+                "completedAt": order.completed_at,
+            },
+        }
+
+    # ---- Claude 卡密管理（复用同一管理口令）----
+    @app.post("/api/claude/admin/mappings/import", dependencies=[Depends(require_admin)])
+    def claude_import_mappings(payload: ImportMappingsRequest, session: Session = Depends(get_db_session)) -> dict:
+        note = payload.note.strip()[:255]
+        seen_in_batch: set[str] = set()
+        results: list[dict] = []
+        for raw in payload.real_cards:
+            real = str(raw or "").strip()
+            if not real:
+                continue
+            fp = fingerprint(real, settings.secret_key)
+            if fp in seen_in_batch:
+                results.append({"realCard": real, "status": "duplicate", "message": "本次提交内重复"})
+                continue
+            seen_in_batch.add(fp)
+
+            existing = (
+                session.query(ClaudeCardMappingModel)
+                .filter(ClaudeCardMappingModel.real_card_fingerprint == fp)
+                .first()
+            )
+            if existing is not None:
+                results.append(
+                    {
+                        "realCard": real,
+                        "externalCode": existing.external_code,
+                        "giftName": existing.gift_name,
+                        "status": "exists",
+                        "message": "该 cdkey 已存在映射",
+                    }
+                )
+                continue
+
+            # check 取商品信息（只读）；失败不阻断录入。
+            gift_name = app_name = ""
+            check_message = ""
+            check_ok = False
+            try:
+                checked = gift_client.check(real)
+                check_ok = bool(checked.get("success"))
+                check_message = str(checked.get("msg") or "")
+                cdata = checked.get("data") if isinstance(checked.get("data"), dict) else {}
+                gift_name = str(cdata.get("gift_name") or "")
+                app_name = str(cdata.get("app") or "")
+            except GiftApiError as exc:
+                check_message = str(exc)
+
+            display, norm = _unique_external_code(session, ClaudeCardMappingModel, "CL")
+            mapping = ClaudeCardMappingModel(
+                external_code=display,
+                external_code_norm=norm,
+                real_card_encrypted=cipher.encrypt(real),
+                real_card_fingerprint=fp,
+                real_card_last4=real[-4:],
+                gift_name=gift_name,
+                app=app_name or "claude",
+                status="active",
+                note=note,
+            )
+            session.add(mapping)
+            session.commit()
+            results.append(
+                {
+                    "realCard": real,
+                    "externalCode": display,
+                    "giftName": gift_name,
+                    "status": "created",
+                    "message": check_message if not check_ok else "已生成",
+                    "checkOk": check_ok,
+                }
+            )
+        created = sum(1 for r in results if r["status"] == "created")
+        return {"ok": True, "created": created, "total": len(results), "results": results}
+
+    @app.get("/api/claude/admin/mappings", dependencies=[Depends(require_admin)])
+    def claude_list_mappings(
+        q: str = Query("", max_length=64),
+        limit: int = Query(500, ge=1, le=2000),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        query = session.query(ClaudeCardMappingModel)
+        keyword = q.strip()
+        if keyword:
+            norm = normalize_external_code(keyword)
+            query = query.filter(ClaudeCardMappingModel.external_code_norm.like(f"%{norm}%"))
+        rows = query.order_by(ClaudeCardMappingModel.id.desc()).limit(limit).all()
+        items = []
+        for row in rows:
+            try:
+                real_card = cipher.decrypt(row.real_card_encrypted) if row.real_card_encrypted else ""
+            except AskWhyCryptoError:
+                real_card = ""
+            items.append(
+                {
+                    "id": row.id,
+                    "externalCode": row.external_code,
+                    "realCard": real_card,
+                    "giftName": row.gift_name,
+                    "app": row.app,
+                    "status": row.status,
+                    "note": row.note,
+                    "createdAt": row.created_at.isoformat() if row.created_at else "",
+                }
+            )
+        return {"ok": True, "count": len(items), "items": items}
+
+    @app.post("/api/claude/admin/mappings/lookup", dependencies=[Depends(require_admin)])
+    def claude_lookup_mappings(payload: LookupMappingsRequest, session: Session = Depends(get_db_session)) -> dict:
+        """批量外部码反查原始 cdkey：保留输入顺序，精确匹配，去重。"""
+        results: list[dict] = []
+        seen: set[str] = set()
+        for raw in payload.external_codes:
+            code = str(raw or "").strip()
+            if not code:
+                continue
+            norm = normalize_external_code(code)
+            if norm in seen:
+                continue
+            seen.add(norm)
+            row = (
+                session.query(ClaudeCardMappingModel)
+                .filter(ClaudeCardMappingModel.external_code_norm == norm)
+                .first()
+            )
+            if row is None:
+                results.append({"input": code, "found": False, "externalCode": "", "realCard": ""})
+                continue
+            try:
+                real_card = cipher.decrypt(row.real_card_encrypted) if row.real_card_encrypted else ""
+            except AskWhyCryptoError:
+                real_card = ""
+            results.append(
+                {
+                    "input": code,
+                    "found": True,
+                    "externalCode": row.external_code,
+                    "realCard": real_card,
+                    "giftName": row.gift_name,
+                    "status": row.status,
+                }
+            )
+        found = sum(1 for r in results if r["found"])
+        return {"ok": True, "found": found, "total": len(results), "results": results}
+
+    @app.patch("/api/claude/admin/mappings/{mapping_id}", dependencies=[Depends(require_admin)])
+    def claude_update_mapping(
+        payload: MappingStatusRequest,
+        mapping_id: int = Path(..., ge=1),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        row = session.get(ClaudeCardMappingModel, mapping_id)
+        if row is None:
+            return _fail("映射不存在")
+        if row.status == "reissued":
+            return _fail("该外部码已重发并失效，不可再变更状态")
+        row.status = payload.status
+        session.commit()
+        return {"ok": True}
+
+    @app.post("/api/claude/admin/mappings/{mapping_id}/reissue", dependencies=[Depends(require_admin)])
+    def claude_reissue_mapping(
+        mapping_id: int = Path(..., ge=1),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        """重新生成外部码：旧码置为 reissued 失效，新建一条指向同一真实 cdkey 的 active 记录。"""
+        old = session.get(ClaudeCardMappingModel, mapping_id)
+        if old is None:
+            return _fail("映射不存在")
+        if old.status == "reissued":
+            return _fail("该外部码已重发，请对最新的外部码操作")
+        display, norm = _unique_external_code(session, ClaudeCardMappingModel, "CL")
+        fresh = ClaudeCardMappingModel(
+            external_code=display,
+            external_code_norm=norm,
+            real_card_encrypted=old.real_card_encrypted,
+            real_card_fingerprint=old.real_card_fingerprint,
+            real_card_last4=old.real_card_last4,
+            gift_name=old.gift_name,
+            app=old.app,
+            status="active",
+            note=old.note,
+        )
+        old.status = "reissued"
+        session.add(fresh)
+        session.commit()
+        return {"ok": True, "externalCode": display}
+
+    @app.delete("/api/claude/admin/mappings/{mapping_id}", dependencies=[Depends(require_admin)])
+    def claude_delete_mapping(
+        mapping_id: int = Path(..., ge=1),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        row = session.get(ClaudeCardMappingModel, mapping_id)
+        if row is None:
+            return _fail("映射不存在")
+        session.delete(row)
+        session.commit()
+        return {"ok": True}
+
+    @app.get("/api/claude/admin/orders", dependencies=[Depends(require_admin)])
+    def claude_list_orders(
+        q: str = Query("", max_length=120),
+        limit: int = Query(200, ge=1, le=1000),
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        query = session.query(ClaudeOrderModel)
+        keyword = q.strip()
+        if keyword:
+            like = f"%{keyword}%"
+            query = query.filter(
+                (ClaudeOrderModel.external_code.like(like))
+                | (ClaudeOrderModel.uid.like(like))
+                | (ClaudeOrderModel.account.like(like))
+            )
+        rows = query.order_by(ClaudeOrderModel.id.desc()).limit(limit).all()
+        items = []
+        for row in rows:
+            try:
+                real_card = cipher.decrypt(row.card_code_encrypted) if row.card_code_encrypted else ""
+            except AskWhyCryptoError:
+                real_card = ""
+            items.append(
+                {
+                    "id": row.id,
+                    "externalCode": row.external_code,
+                    "realCard": real_card,
+                    "uid": row.uid,
+                    "giftName": row.gift_name,
+                    "useStatus": row.use_status,
+                    "status": row.status,
+                    "resultMessage": row.result_message,
+                    "account": row.account,
+                    "completedAt": row.completed_at,
+                    "submitIp": row.submit_ip,
+                    "createdAt": row.created_at.isoformat() if row.created_at else "",
+                    "updatedAt": row.updated_at.isoformat() if row.updated_at else "",
+                }
+            )
+        return {"ok": True, "count": len(items), "items": items}
 
     return app
 

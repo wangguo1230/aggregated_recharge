@@ -57,6 +57,9 @@ class AskWhySettings:
     admin_token: str = ""
     askwhy_base_url: str = "https://askwhy123.shop"
     askwhy_api_prefix: str = "/api"
+    # Gift 提交页上游（Claude Pro 充值走此通道）
+    gift_base_url: str = "https://gpt.86gamestore.com"
+    gift_api_prefix: str = "/api"
     request_timeout_seconds: int = 60
     request_retry_attempts: int = 2
     request_proxy: str = ""
@@ -96,6 +99,9 @@ def load_askwhy_settings() -> AskWhySettings:
         askwhy_base_url=str(os.environ.get("ASKWHY_BASE_URL", "https://askwhy123.shop")).strip().rstrip("/")
         or "https://askwhy123.shop",
         askwhy_api_prefix=str(os.environ.get("ASKWHY_API_PREFIX", "/api")).strip() or "/api",
+        gift_base_url=str(os.environ.get("GIFT_BASE_URL", "https://gpt.86gamestore.com")).strip().rstrip("/")
+        or "https://gpt.86gamestore.com",
+        gift_api_prefix=str(os.environ.get("GIFT_API_PREFIX", "/api")).strip() or "/api",
         request_timeout_seconds=_int_env("ASKWHY_REQUEST_TIMEOUT", 60),
         request_retry_attempts=_int_env("ASKWHY_REQUEST_RETRY", 2),
         request_proxy=str(os.environ.get("ASKWHY_REQUEST_PROXY", "")).strip(),

@@ -79,3 +79,12 @@ class SmsImportMappingsRequest(BaseModel):
     note: str = Field("", max_length=255)
 
     model_config = {"populate_by_name": True}
+
+
+# ---- Claude Pro 充值相关请求体 ----
+class ClaudeActivateRequest(BaseModel):
+    # 外部码 + 客户的 Claude Organization ID（uid，Account 页面里的 Organization ID）。
+    card_code: str = Field(..., alias="cardCode", min_length=1)
+    uid: str = Field(..., min_length=1, max_length=120)
+
+    model_config = {"populate_by_name": True}

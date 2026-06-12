@@ -194,3 +194,90 @@ export async function deleteSmsMapping(id: number): Promise<void> {
   const { data } = await api.delete<BaseResult>(`/sms/admin/mappings/${id}`);
   unwrap(data);
 }
+
+// ===== Claude Pro 卡密映射（Gift 上游）=====
+export interface ClaudeMappingItem {
+  id: number;
+  externalCode: string;
+  realCard: string;
+  giftName: string;
+  app: string;
+  status: string;
+  note: string;
+  createdAt: string;
+}
+
+export interface ClaudeImportResultItem {
+  realCard: string;
+  externalCode?: string;
+  giftName?: string;
+  status: string;
+  message?: string;
+  checkOk?: boolean;
+}
+
+export interface ClaudeOrderItem {
+  id: number;
+  externalCode: string;
+  realCard: string;
+  uid: string;
+  giftName: string;
+  useStatus: number;
+  status: string;
+  resultMessage: string;
+  account: string;
+  completedAt: string;
+  submitIp: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function importClaudeMappings(
+  realCards: string[],
+  note = '',
+): Promise<{ created: number; total: number; results: ClaudeImportResultItem[] }> {
+  const { data } = await api.post<BaseResult & { created: number; total: number; results: ClaudeImportResultItem[] }>(
+    '/claude/admin/mappings/import',
+    { realCards, note },
+  );
+  const r = unwrap(data);
+  return { created: r.created, total: r.total, results: r.results };
+}
+
+export async function listClaudeMappings(q = ''): Promise<ClaudeMappingItem[]> {
+  const { data } = await api.get<BaseResult & { items: ClaudeMappingItem[] }>('/claude/admin/mappings', {
+    params: { q },
+  });
+  return unwrap(data).items || [];
+}
+
+// 批量外部码反查原始 cdkey。
+export async function lookupClaudeMappings(externalCodes: string[]): Promise<LookupResultItem[]> {
+  const { data } = await api.post<BaseResult & { results: LookupResultItem[] }>('/claude/admin/mappings/lookup', {
+    externalCodes,
+  });
+  return unwrap(data).results || [];
+}
+
+export async function updateClaudeMappingStatus(id: number, status: 'active' | 'disabled'): Promise<void> {
+  const { data } = await api.patch<BaseResult>(`/claude/admin/mappings/${id}`, { status });
+  unwrap(data);
+}
+
+// 重新生成外部码：旧码失效，新建指向同一真实 cdkey 的新外部码，返回新码。
+export async function reissueClaudeMapping(id: number): Promise<string> {
+  const { data } = await api.post<BaseResult & { externalCode?: string }>(`/claude/admin/mappings/${id}/reissue`, {});
+  return unwrap(data).externalCode || '';
+}
+
+export async function deleteClaudeMapping(id: number): Promise<void> {
+  const { data } = await api.delete<BaseResult>(`/claude/admin/mappings/${id}`);
+  unwrap(data);
+}
+
+export async function listClaudeOrders(q = ''): Promise<ClaudeOrderItem[]> {
+  const { data } = await api.get<BaseResult & { items: ClaudeOrderItem[] }>('/claude/admin/orders', {
+    params: { q },
+  });
+  return unwrap(data).items || [];
+}

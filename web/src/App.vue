@@ -44,6 +44,22 @@
               <span class="user-rail__text"><span>手机接码</span><small>长期接收短信</small></span>
             </a>
           </RouterLink>
+
+          <RouterLink to="/claude" custom v-slot="{ href, navigate }">
+            <a
+              :href="href"
+              class="user-rail__item"
+              :class="{ 'user-rail__item--active': activeSection === 'claude' }"
+              @click="navigate"
+            >
+              <span class="user-rail__icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z" fill="currentColor" />
+                </svg>
+              </span>
+              <span class="user-rail__text"><span>Claude 充值</span><small>外部码 + uid 提交</small></span>
+            </a>
+          </RouterLink>
         </nav>
       </aside>
 
@@ -79,6 +95,7 @@ const copy: Record<string, { title: string; eyebrow: string; description: string
   recharge: { title: '充值', eyebrow: 'Submit', description: '校验卡密、校验 Session，实时查看充值进度' },
   cards: { title: '卡密查询', eyebrow: 'Card Lookup', description: '批量查询卡密使用状况、充值账号与时间' },
   sms: { title: '手机接码', eyebrow: 'SMS Receive', description: '输入兑换码获取手机号，长期接收短信验证码' },
+  claude: { title: 'Claude Pro 充值', eyebrow: 'Claude Recharge', description: '输入充值卡密与 Organization ID（uid），提交激活 Claude Pro' },
 };
 
 const current = computed(() => copy[String(route.name || '')] || copy.recharge);
@@ -87,5 +104,9 @@ const pageEyebrow = computed(() => current.value.eyebrow);
 const pageDescription = computed(() => current.value.description);
 
 // 两大区块：卡密充值（充值 + 卡密查询）与手机接码；卡密充值内含右侧子 tab。
-const activeSection = computed(() => (route.name === 'sms' ? 'sms' : 'recharge'));
+const activeSection = computed(() => {
+  if (route.name === 'sms') return 'sms';
+  if (route.name === 'claude') return 'claude';
+  return 'recharge';
+});
 </script>
