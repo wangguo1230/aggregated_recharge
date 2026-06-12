@@ -24,7 +24,23 @@
                   <path d="M13 3 L5 13 H11 L10 21 L19 10 H13 Z" fill="currentColor" />
                 </svg>
               </span>
-              <span class="user-rail__text"><span>卡密充值</span><small>充值 · 卡密查询</small></span>
+              <span class="user-rail__text"><span>GPT 充值</span><small>充值 · 卡密查询</small></span>
+            </a>
+          </RouterLink>
+
+          <RouterLink to="/claude" custom v-slot="{ href, navigate }">
+            <a
+              :href="href"
+              class="user-rail__item"
+              :class="{ 'user-rail__item--active': activeSection === 'claude' }"
+              @click="navigate"
+            >
+              <span class="user-rail__icon">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z" fill="currentColor" />
+                </svg>
+              </span>
+              <span class="user-rail__text"><span>Claude 充值</span><small>卡密激活 Pro 会员</small></span>
             </a>
           </RouterLink>
 
@@ -42,22 +58,6 @@
                 </svg>
               </span>
               <span class="user-rail__text"><span>手机接码</span><small>长期接收短信</small></span>
-            </a>
-          </RouterLink>
-
-          <RouterLink to="/claude" custom v-slot="{ href, navigate }">
-            <a
-              :href="href"
-              class="user-rail__item"
-              :class="{ 'user-rail__item--active': activeSection === 'claude' }"
-              @click="navigate"
-            >
-              <span class="user-rail__icon">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 3 L14 10 L21 12 L14 14 L12 21 L10 14 L3 12 L10 10 Z" fill="currentColor" />
-                </svg>
-              </span>
-              <span class="user-rail__text"><span>Claude 充值</span><small>卡密激活 Pro 会员</small></span>
             </a>
           </RouterLink>
         </nav>
