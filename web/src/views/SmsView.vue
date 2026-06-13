@@ -3,7 +3,7 @@
     <div class="submit-hero">
       <div>
         <p class="eyebrow">10666 Recharge</p>
-        <h2>手机接码</h2>
+        <h2>{{ t('sms.heroTitle') }}</h2>
       </div>
       <div class="submit-hero__meter">
         <span>{{ stepEyebrow }}</span>
@@ -20,29 +20,29 @@
           <span class="rail-mark"><BrandLogo /></span>
           <div>
             <p class="eyebrow">Flow</p>
-            <h2>接码流程</h2>
+            <h2>{{ t('sms.flowTitle') }}</h2>
           </div>
         </div>
 
         <div class="account-strip" :class="{ 'is-ready': Boolean(card) }">
-          <span>接码手机号</span>
-          <strong>{{ card?.phone || '待校验' }}</strong>
-          <em>{{ card ? (latestCode ? `最新验证码：${latestCode}` : '已绑定，可接收短信') : '先校验兑换码' }}</em>
+          <span>{{ t('sms.phone') }}</span>
+          <strong>{{ card?.phone || t('sms.pendingVerify') }}</strong>
+          <em>{{ card ? (latestCode ? t('sms.latestCodeIs', { code: latestCode }) : t('sms.bound')) : t('sms.verifyFirst') }}</em>
         </div>
 
         <ol class="submit-steps">
           <li :class="{ active: activeStep === 0, done: Boolean(card) }">
             <span>1</span>
             <div>
-              <strong>校验兑换码</strong>
-              <small>{{ card ? '已获取手机号' : '检查兑换码是否可用' }}</small>
+              <strong>{{ t('sms.step1Title') }}</strong>
+              <small>{{ card ? t('sms.step1Done') : t('sms.step1Desc') }}</small>
             </div>
           </li>
           <li :class="{ active: activeStep === 1, done: Boolean(latestCode) }">
             <span>2</span>
             <div>
-              <strong>接收短信</strong>
-              <small>{{ listening ? '监听中…' : messages.length ? `已收到 ${messages.length} 条` : '获取验证码' }}</small>
+              <strong>{{ t('sms.step2Title') }}</strong>
+              <small>{{ listening ? t('sms.listeningDots') : messages.length ? t('sms.received', { n: messages.length }) : t('sms.getCode') }}</small>
             </div>
           </li>
         </ol>
@@ -59,11 +59,11 @@
 
         <!-- Step 1: 校验兑换码 -->
         <el-form v-if="activeStep === 0" label-position="top" @submit.prevent>
-          <el-form-item label="兑换码">
-            <el-input v-model.trim="cardCode" placeholder="例如 SM-XXXXX-XXXXX" clearable @keyup.enter="handleVerify" />
+          <el-form-item :label="t('sms.cardLabel')">
+            <el-input v-model.trim="cardCode" :placeholder="t('sms.cardPlaceholder')" clearable @keyup.enter="handleVerify" />
           </el-form-item>
           <div class="action-row submit-action-row">
-            <el-button :loading="verifying" type="primary" @click="handleVerify">校验并获取手机号</el-button>
+            <el-button :loading="verifying" type="primary" @click="handleVerify">{{ t('sms.verifyBtn') }}</el-button>
           </div>
         </el-form>
 
@@ -71,19 +71,19 @@
         <div v-else class="submit-review">
           <div class="review-grid">
             <div>
-              <span>接码手机号</span>
+              <span>{{ t('sms.phone') }}</span>
               <strong class="mono">{{ card?.phone || '-' }}</strong>
             </div>
             <div>
-              <span>最新验证码</span>
+              <span>{{ t('sms.latestCode') }}</span>
               <strong class="mono sms-code-value">{{ latestCode || '-' }}</strong>
             </div>
             <div>
-              <span>收到短信</span>
-              <strong>{{ messages.length }} 条</strong>
+              <span>{{ t('sms.receivedSms') }}</span>
+              <strong>{{ t('sms.count', { n: messages.length }) }}</strong>
             </div>
             <div>
-              <span>当前状态</span>
+              <span>{{ t('sms.currentStatus') }}</span>
               <strong>{{ statusText }}</strong>
             </div>
           </div>
@@ -91,16 +91,16 @@
           <!-- 监听中提示条 -->
           <div v-if="listening" class="sms-listening">
             <span class="sms-listening__dot"></span>
-            <span>正在监听新短信，到达后自动展示…</span>
-            <strong>剩余 {{ countdown }}s</strong>
+            <span>{{ t('sms.listeningTip') }}</span>
+            <strong>{{ t('sms.remaining', { s: countdown }) }}</strong>
           </div>
 
           <div v-else class="session-guide">
-            <p class="session-guide__title">长期接码说明</p>
+            <p class="session-guide__title">{{ t('sms.guideTitle') }}</p>
             <ol>
-              <li>点「获取验证码」后系统自动监听短信，到达即自动展示并高亮，无需反复点击。</li>
-              <li>同一手机号可长期使用，每次需要时再点一次即可监听新的验证码。</li>
-              <li>本轮超时未收到时，点「重新获取」再监听一轮。</li>
+              <li>{{ t('sms.guide1') }}</li>
+              <li>{{ t('sms.guide2') }}</li>
+              <li>{{ t('sms.guide3') }}</li>
             </ol>
           </div>
 
@@ -113,12 +113,12 @@
 
           <div class="action-row submit-action-row">
             <el-button v-if="!listening" :type="messages.length ? 'default' : 'primary'" @click="startListening">
-              {{ messages.length ? '重新获取' : '获取验证码' }}
+              {{ messages.length ? t('sms.retry') : t('sms.getCode') }}
             </el-button>
-            <el-button v-else type="primary" loading disabled>监听中 {{ countdown }}s</el-button>
-            <el-button v-if="listening" @click="stopListening">停止</el-button>
-            <el-button v-if="latestCode" type="success" plain @click="copyText(latestCode)">复制验证码</el-button>
-            <el-button :disabled="listening" @click="resetAll">更换兑换码</el-button>
+            <el-button v-else type="primary" loading disabled>{{ t('sms.listeningS', { s: countdown }) }}</el-button>
+            <el-button v-if="listening" @click="stopListening">{{ t('sms.stop') }}</el-button>
+            <el-button v-if="latestCode" type="success" plain @click="copyText(latestCode)">{{ t('sms.copyCode') }}</el-button>
+            <el-button :disabled="listening" @click="resetAll">{{ t('sms.changeCard') }}</el-button>
           </div>
         </div>
       </main>
@@ -129,8 +129,11 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus';
 import { computed, onBeforeUnmount, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { fetchSms, verifySmsCard, type SmsCard } from '../api/sms';
 import BrandLogo from '../components/BrandLogo.vue';
+
+const { t } = useI18n();
 
 interface SmsMessage {
   time: string;
@@ -159,11 +162,11 @@ const activeStep = computed(() => currentStep.value);
 const latestCode = computed(() => messages.value.find((m) => m.code)?.code || '');
 
 const stepEyebrow = computed(() => `Step ${String(activeStep.value + 1).padStart(2, '0')}`);
-const stepTitle = computed(() => (activeStep.value === 0 ? '校验兑换码' : '接收短信'));
+const stepTitle = computed(() => (activeStep.value === 0 ? t('sms.step1Title') : t('sms.step2Title')));
 const statusText = computed(() => {
-  if (listening.value) return `监听中 · 剩 ${countdown.value}s`;
-  if (latestCode.value) return '已收到验证码';
-  return messages.value.length ? '等待新短信' : '尚未接收';
+  if (listening.value) return t('sms.statusListening', { s: countdown.value });
+  if (latestCode.value) return t('sms.statusGot');
+  return messages.value.length ? t('sms.statusWaiting') : t('sms.statusNone');
 });
 const progressValue = computed(() => {
   if (activeStep.value === 0) return card.value ? 50 : 14;
@@ -171,10 +174,10 @@ const progressValue = computed(() => {
   return listening.value ? 84 : 72;
 });
 const stepTagText = computed(() => {
-  if (activeStep.value === 0) return card.value ? card.value.phone : '待校验';
-  if (latestCode.value) return `验证码 ${latestCode.value}`;
-  if (listening.value) return '监听中';
-  return messages.value.length ? '已接收' : '待接收';
+  if (activeStep.value === 0) return card.value ? card.value.phone : t('sms.pendingVerify');
+  if (latestCode.value) return t('sms.codeIs', { code: latestCode.value });
+  if (listening.value) return t('sms.listening');
+  return messages.value.length ? t('sms.receivedTag') : t('sms.pendingTag');
 });
 const stepTagType = computed(() => {
   if (activeStep.value === 0) return card.value ? 'success' : 'info';
@@ -185,7 +188,7 @@ const stepTagType = computed(() => {
 
 async function handleVerify() {
   if (!cardCode.value) {
-    ElMessage.warning('请输入兑换码');
+    ElMessage.warning(t('sms.enterCard'));
     return;
   }
   verifying.value = true;
@@ -193,7 +196,7 @@ async function handleVerify() {
     card.value = await verifySmsCard(cardCode.value);
     resetMessages();
     currentStep.value = 1;
-    ElMessage.success('校验通过，已绑定手机号');
+    ElMessage.success(t('sms.verifyOk'));
   } catch (error) {
     ElMessage.error((error as Error).message);
   } finally {
@@ -214,7 +217,7 @@ async function pollOnce() {
         content: result.content,
       });
       stopListening();
-      ElMessage.success(result.code ? `已收到验证码 ${result.code}` : '已收到新短信');
+      ElMessage.success(result.code ? t('sms.gotCode', { code: result.code }) : t('sms.gotSms'));
     }
   } catch (error) {
     stopListening();
@@ -234,7 +237,7 @@ function startListening() {
     countdown.value -= 1;
     if (countdown.value <= 0) {
       stopListening();
-      ElMessage.info('本轮未收到新短信，可重新获取');
+      ElMessage.info(t('sms.roundTimeout'));
     }
   }, 1000);
 }
@@ -289,16 +292,16 @@ async function copyText(text: string) {
   try {
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(text);
-      ElMessage.success('已复制');
+      ElMessage.success(t('common.copied'));
       return;
     }
   } catch {
     // 安全上下文下仍失败则继续走兜底
   }
   if (fallbackCopy(text)) {
-    ElMessage.success('已复制');
+    ElMessage.success(t('common.copied'));
   } else {
-    ElMessage.warning('复制失败，请手动选择文本复制');
+    ElMessage.warning(t('common.copyFailed'));
   }
 }
 

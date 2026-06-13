@@ -3,7 +3,7 @@
     <div class="submit-hero">
       <div>
         <p class="eyebrow">Claude Recharge</p>
-        <h2>Claude Pro 充值</h2>
+        <h2>{{ t('claude.heroTitle') }}</h2>
       </div>
       <div class="submit-hero__meter">
         <span>{{ stepEyebrow }}</span>
@@ -20,29 +20,29 @@
           <span class="rail-mark"><BrandLogo /></span>
           <div>
             <p class="eyebrow">Flow</p>
-            <h2>充值流程</h2>
+            <h2>{{ t('claude.flowTitle') }}</h2>
           </div>
         </div>
 
         <div class="account-strip" :class="{ 'is-ready': Boolean(card) }">
-          <span>商品</span>
-          <strong>{{ card?.giftName || '待校验' }}</strong>
-          <em>{{ card ? '卡密可用，填写账号 ID 即可提交' : '先校验卡密' }}</em>
+          <span>{{ t('claude.product') }}</span>
+          <strong>{{ card?.giftName || t('claude.pendingVerify') }}</strong>
+          <em>{{ card ? t('claude.cardReady') : t('claude.verifyFirst') }}</em>
         </div>
 
         <ol class="submit-steps">
           <li :class="{ active: activeStep === 0, done: Boolean(card) }">
             <span>1</span>
             <div>
-              <strong>校验卡密</strong>
-              <small>{{ card ? '已获取商品信息' : '检查卡密是否可用' }}</small>
+              <strong>{{ t('claude.step1Title') }}</strong>
+              <small>{{ card ? t('claude.gotProduct') : t('claude.step1Desc') }}</small>
             </div>
           </li>
           <li :class="{ active: activeStep === 1, done: succeeded }">
             <span>2</span>
             <div>
-              <strong>提交充值</strong>
-              <small>{{ succeeded ? '充值成功' : '填写 Organization ID' }}</small>
+              <strong>{{ t('claude.step2Title') }}</strong>
+              <small>{{ succeeded ? t('claude.success') : t('claude.step2Desc') }}</small>
             </div>
           </li>
         </ol>
@@ -59,11 +59,11 @@
 
         <!-- Step 1: 校验卡密 -->
         <el-form v-if="activeStep === 0" label-position="top" @submit.prevent>
-          <el-form-item label="充值卡密">
-            <el-input v-model.trim="cardCode" placeholder="例如 CL-XXXXX-XXXXX" clearable @keyup.enter="handleVerify" />
+          <el-form-item :label="t('claude.cardLabel')">
+            <el-input v-model.trim="cardCode" :placeholder="t('claude.cardPlaceholder')" clearable @keyup.enter="handleVerify" />
           </el-form-item>
           <div class="action-row submit-action-row">
-            <el-button :loading="verifying" type="primary" @click="handleVerify">校验卡密</el-button>
+            <el-button :loading="verifying" type="primary" @click="handleVerify">{{ t('claude.step1Title') }}</el-button>
           </div>
         </el-form>
 
@@ -71,20 +71,20 @@
         <div v-else class="submit-review">
           <div class="review-grid">
             <div>
-              <span>商品</span>
+              <span>{{ t('claude.product') }}</span>
               <strong>{{ card?.giftName || '-' }}</strong>
             </div>
             <div>
-              <span>卡密状态</span>
+              <span>{{ t('claude.cardStatus') }}</span>
               <strong>{{ card?.statusHint || useStatusText }}</strong>
             </div>
           </div>
 
           <el-form label-position="top" @submit.prevent>
-            <el-form-item label="Claude 账号 ID（Organization ID）">
+            <el-form-item :label="t('claude.uidLabel')">
               <el-input
                 v-model.trim="uid"
-                placeholder="请粘贴 Claude Account 页面里的 Organization ID（UUID 格式）"
+                :placeholder="t('claude.uidPlaceholder')"
                 clearable
                 @keyup.enter="handleActivate"
               />
@@ -94,31 +94,31 @@
           <!-- 如何获取 Organization ID 引导 -->
           <div class="claude-guide">
             <div class="claude-guide__head">
-              <strong>如何获取 Organization ID（UID）</strong>
+              <strong>{{ t('claude.guideTitle') }}</strong>
               <a
                 class="claude-guide__btn"
                 href="https://claude.ai/new#settings/account"
                 target="_blank"
                 rel="noopener noreferrer"
-              >打开 Claude Account 页面 ↗</a>
+              >{{ t('claude.openAccount') }}</a>
             </div>
             <ol class="claude-guide__steps">
-              <li>点上方按钮打开 <b>Claude Account</b> 页面（claude.ai/new#settings/account）。</li>
-              <li>页面左侧点击 <b>Account</b>，在面板里找到 <b>Organization ID</b>，即你的账号 UID（一串 UUID）。</li>
-              <li>复制这串 UID 粘贴到上面的输入框，确认无误后点「提交充值」。</li>
+              <li v-html="t('claude.guideStep1')"></li>
+              <li v-html="t('claude.guideStep2')"></li>
+              <li v-html="t('claude.guideStep3')"></li>
             </ol>
           </div>
 
           <!-- 结果提示 -->
           <div v-if="resultMessage" class="step-summary" :class="resultClass">
             <strong>{{ resultMessage }}</strong>
-            <span v-if="order?.account">账号：{{ order.account }}</span>
+            <span v-if="order?.account">{{ t('claude.accountPrefix') }}{{ order.account }}</span>
           </div>
 
           <div class="action-row submit-action-row">
-            <el-button v-if="!succeeded" :loading="activating" type="primary" @click="handleActivate">提交充值</el-button>
-            <el-button v-if="processing" :loading="rechecking" @click="handleRecheck">刷新状态</el-button>
-            <el-button :disabled="activating" @click="resetAll">更换卡密</el-button>
+            <el-button v-if="!succeeded" :loading="activating" type="primary" @click="handleActivate">{{ t('claude.step2Title') }}</el-button>
+            <el-button v-if="processing" :loading="rechecking" @click="handleRecheck">{{ t('claude.refresh') }}</el-button>
+            <el-button :disabled="activating" @click="resetAll">{{ t('claude.changeCard') }}</el-button>
           </div>
         </div>
       </main>
@@ -129,8 +129,11 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus';
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { activateClaude, verifyClaudeCard, type ClaudeActivateResult, type ClaudeCard } from '../api/claude';
 import BrandLogo from '../components/BrandLogo.vue';
+
+const { t } = useI18n();
 
 const cardCode = ref('');
 const card = ref<ClaudeCard | null>(null);
@@ -148,32 +151,35 @@ const activeStep = computed(() => currentStep.value);
 const succeeded = computed(() => lastUseStatus.value === 1);
 const processing = computed(() => lastUseStatus.value === -1);
 
-const USE_STATUS_TEXT: Record<number, string> = {
-  0: '待提交',
-  [-1]: '处理中',
-  1: '已完成',
-  [-9]: '库存不足',
-  [-999]: '异常',
-  [-1000]: '已作废',
-  [-1001]: '售后处理',
+// use_status 数值 → locale 键
+const USE_STATUS_KEY: Record<number, string> = {
+  0: 'pending',
+  [-1]: 'processing',
+  1: 'done',
+  [-9]: 'outOfStock',
+  [-999]: 'error',
+  [-1000]: 'voided',
+  [-1001]: 'aftersale',
 };
 const useStatusText = computed(() => {
   const s = card.value?.useStatus;
-  return s == null ? '-' : (USE_STATUS_TEXT[s] ?? String(s));
+  if (s == null) return '-';
+  const k = USE_STATUS_KEY[s];
+  return k ? t(`claude.use.${k}`) : String(s);
 });
 
 const stepEyebrow = computed(() => `Step ${String(activeStep.value + 1).padStart(2, '0')}`);
-const stepTitle = computed(() => (activeStep.value === 0 ? '校验卡密' : '提交充值'));
+const stepTitle = computed(() => (activeStep.value === 0 ? t('claude.step1Title') : t('claude.step2Title')));
 const progressValue = computed(() => {
   if (activeStep.value === 0) return card.value ? 50 : 14;
   if (succeeded.value) return 100;
   return processing.value ? 84 : 72;
 });
 const stepTagText = computed(() => {
-  if (activeStep.value === 0) return card.value ? card.value.giftName || '已校验' : '待校验';
-  if (succeeded.value) return '充值成功';
-  if (processing.value) return '处理中';
-  return '待提交';
+  if (activeStep.value === 0) return card.value ? card.value.giftName || t('claude.verified') : t('claude.pendingVerify');
+  if (succeeded.value) return t('claude.success');
+  if (processing.value) return t('claude.use.processing');
+  return t('claude.use.pending');
 });
 const stepTagType = computed(() => {
   if (activeStep.value === 0) return card.value ? 'success' : 'info';
@@ -187,7 +193,7 @@ const resultClass = computed(() =>
 
 async function handleVerify() {
   if (!cardCode.value) {
-    ElMessage.warning('请输入卡密');
+    ElMessage.warning(t('claude.enterCard'));
     return;
   }
   verifying.value = true;
@@ -198,7 +204,7 @@ async function handleVerify() {
     resultMessage.value = '';
     order.value = null;
     currentStep.value = 1;
-    ElMessage.success('校验通过');
+    ElMessage.success(t('claude.verifyOk'));
   } catch (error) {
     ElMessage.error((error as Error).message);
   } finally {
@@ -208,7 +214,7 @@ async function handleVerify() {
 
 async function handleActivate() {
   if (!uid.value) {
-    ElMessage.warning('请输入 Organization ID');
+    ElMessage.warning(t('claude.enterUid'));
     return;
   }
   activating.value = true;
@@ -216,13 +222,13 @@ async function handleActivate() {
     const r = await activateClaude(cardCode.value, uid.value);
     order.value = r.order;
     lastUseStatus.value = r.order?.useStatus ?? (r.ok ? 1 : lastUseStatus.value);
-    resultMessage.value = r.message || (r.ok ? '充值成功' : '提交失败');
+    resultMessage.value = r.message || (r.ok ? t('claude.success') : t('claude.submitFail'));
     if (r.ok && lastUseStatus.value === 1) {
-      ElMessage.success('充值成功');
+      ElMessage.success(t('claude.success'));
     } else if (processing.value) {
-      ElMessage.info('订单处理中，请稍后刷新状态');
+      ElMessage.info(t('claude.processingTip'));
     } else {
-      ElMessage.warning(r.message || '提交未成功');
+      ElMessage.warning(r.message || t('claude.submitNotOk'));
     }
   } catch (error) {
     ElMessage.error((error as Error).message);
@@ -238,10 +244,10 @@ async function handleRecheck() {
     card.value = c;
     lastUseStatus.value = c.useStatus ?? null;
     if (c.useStatus === 1) {
-      resultMessage.value = '充值成功';
-      ElMessage.success('充值成功');
+      resultMessage.value = t('claude.success');
+      ElMessage.success(t('claude.success'));
     } else if (c.useStatus === -1) {
-      ElMessage.info('仍在处理中，请稍后再刷新');
+      ElMessage.info(t('claude.stillProcessing'));
     } else {
       resultMessage.value = c.statusHint || message || '';
     }

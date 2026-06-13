@@ -3,7 +3,7 @@
     <div class="submit-hero">
       <div>
         <p class="eyebrow">Card Lookup</p>
-        <h2>卡密查询</h2>
+        <h2>{{ t('cards.title') }}</h2>
       </div>
     </div>
 
@@ -12,13 +12,13 @@
         <div class="submit-panel__head">
           <div>
             <p class="eyebrow">Lookup</p>
-            <h3>查询卡密使用状况</h3>
+            <h3>{{ t('cards.subtitle') }}</h3>
           </div>
-          <el-tag :type="items.length ? 'success' : 'info'">{{ items.length ? `共 ${items.length} 条` : '待查询' }}</el-tag>
+          <el-tag :type="items.length ? 'success' : 'info'">{{ items.length ? t('cards.totalN', { n: items.length }) : t('cards.pending') }}</el-tag>
         </div>
 
         <el-form label-position="top" @submit.prevent>
-          <el-form-item label="卡密（每行一个，或用逗号分隔，最多 200 个）">
+          <el-form-item :label="t('cards.inputLabel')">
             <el-input
               v-model="raw"
               type="textarea"
@@ -28,26 +28,26 @@
             />
           </el-form-item>
           <div class="action-row submit-action-row">
-            <el-button :loading="loading" type="primary" @click="handleQuery">查询</el-button>
+            <el-button :loading="loading" type="primary" @click="handleQuery">{{ t('cards.queryBtn') }}</el-button>
           </div>
         </el-form>
 
-        <el-table v-if="items.length" :data="items" border style="margin-top: 8px" empty-text="无结果">
-          <el-table-column label="卡密" min-width="220" show-overflow-tooltip>
+        <el-table v-if="items.length" :data="items" border style="margin-top: 8px" :empty-text="t('cards.noResult')">
+          <el-table-column :label="t('cards.colCard')" min-width="220" show-overflow-tooltip>
             <template #default="{ row }"><span class="mono">{{ row.cardCode }}</span></template>
           </el-table-column>
-          <el-table-column label="状态" width="120">
+          <el-table-column :label="t('cards.colStatus')" width="120">
             <template #default="{ row }">
               <el-tag :type="statusType(row.cardStatus)" size="small">{{ statusLabel(row.cardStatus) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="充值账号" min-width="200" show-overflow-tooltip>
+          <el-table-column :label="t('cards.colAccount')" min-width="200" show-overflow-tooltip>
             <template #default="{ row }"><span class="mono">{{ row.rechargeAccount || '-' }}</span></template>
           </el-table-column>
-          <el-table-column label="充值时间" min-width="180">
+          <el-table-column :label="t('cards.colTime')" min-width="180">
             <template #default="{ row }">{{ formatTime(row.rechargeTime) }}</template>
           </el-table-column>
-          <el-table-column label="置换" min-width="180" show-overflow-tooltip>
+          <el-table-column :label="t('cards.colReplace')" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
               <span v-if="row.replacedByCardCode" class="mono">→ {{ row.replacedByCardCode }}</span>
               <span v-else-if="row.previousCardCode" class="mono">← {{ row.previousCardCode }}</span>
@@ -63,15 +63,19 @@
 <script setup lang="ts">
 import { ElMessage } from 'element-plus';
 import { ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import { queryCards, type AskWhyCardStatus } from '../api/askwhy';
 
-const STATUS_LABELS: Record<string, string> = {
-  UNUSED: '未使用',
-  LOCKED: '处理中',
-  USED: '已使用',
-  ABNORMAL: '异常',
-  DISABLED: '已禁用',
-  NOT_FOUND: '不存在',
+const { t } = useI18n();
+
+// 上游状态码 → locale 键
+const STATUS_KEY: Record<string, string> = {
+  UNUSED: 'unused',
+  LOCKED: 'locked',
+  USED: 'used',
+  ABNORMAL: 'abnormal',
+  DISABLED: 'disabled',
+  NOT_FOUND: 'notFound',
 };
 const STATUS_TYPES: Record<string, string> = {
   UNUSED: 'success',
@@ -87,7 +91,8 @@ const loading = ref(false);
 const items = ref<AskWhyCardStatus[]>([]);
 
 function statusLabel(status: string) {
-  return STATUS_LABELS[status] || status || '-';
+  const k = STATUS_KEY[status];
+  return k ? t(`cards.status.${k}`) : status || '-';
 }
 function statusType(status: string) {
   return STATUS_TYPES[status] || 'info';
@@ -112,11 +117,11 @@ function parseCodes(): string[] {
 async function handleQuery() {
   const codes = parseCodes();
   if (!codes.length) {
-    ElMessage.warning('请至少输入一个卡密');
+    ElMessage.warning(t('cards.enterCard'));
     return;
   }
   if (codes.length > 200) {
-    ElMessage.warning('一次最多查询 200 个卡密');
+    ElMessage.warning(t('cards.max200'));
     return;
   }
   loading.value = true;
