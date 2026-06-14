@@ -286,11 +286,16 @@
         <div class="admin-card__head admin-section-gap">
           <div><p class="kicker">SMS Cards</p><h3>接码卡密列表</h3></div>
           <div class="admin-toolbar">
+            <span v-if="smsSelected.length" style="font-size: 13px; color: var(--recharge-muted)">已选 {{ smsSelected.length }}</span>
+            <el-button :loading="smsBatching" :disabled="!smsSelected.length" size="small" @click="batchSms('enable')">批量启用</el-button>
+            <el-button :loading="smsBatching" :disabled="!smsSelected.length" size="small" @click="batchSms('disable')">批量停用</el-button>
+            <el-button :loading="smsBatching" :disabled="!smsSelected.length" size="small" type="danger" @click="batchSms('delete')">批量删除</el-button>
             <el-input v-model.trim="smsSearch" placeholder="搜兑换码/手机号" style="width: 180px" clearable @keyup.enter="loadSmsMappings" />
             <el-button :loading="smsLoading" @click="loadSmsMappings">刷新</el-button>
           </div>
         </div>
-        <el-table v-loading="smsLoading" :data="smsMappings" border empty-text="暂无接码卡密">
+        <el-table v-loading="smsLoading" :data="smsMappings" border empty-text="暂无接码卡密" @selection-change="onSmsSelectionChange">
+          <el-table-column type="selection" width="44" />
           <el-table-column label="兑换码" min-width="170">
             <template #default="{ row }">
               <span class="mono">{{ row.externalCode }}</span>
@@ -413,11 +418,16 @@
         <div class="admin-card__head admin-section-gap">
           <div><p class="kicker">Claude Cards</p><h3>Claude 卡密列表</h3></div>
           <div class="admin-toolbar">
+            <span v-if="claudeSelected.length" style="font-size: 13px; color: var(--recharge-muted)">已选 {{ claudeSelected.length }}</span>
+            <el-button :loading="claudeBatching" :disabled="!claudeSelected.length" size="small" @click="batchClaude('enable')">批量启用</el-button>
+            <el-button :loading="claudeBatching" :disabled="!claudeSelected.length" size="small" @click="batchClaude('disable')">批量停用</el-button>
+            <el-button :loading="claudeBatching" :disabled="!claudeSelected.length" size="small" type="danger" @click="batchClaude('delete')">批量删除</el-button>
             <el-input v-model.trim="claudeSearch" placeholder="搜外部码" style="width: 160px" clearable @keyup.enter="loadClaudeMappings" />
             <el-button :loading="claudeLoading" @click="loadClaudeMappings">刷新</el-button>
           </div>
         </div>
-        <el-table v-loading="claudeLoading" :data="claudeMappings" border empty-text="暂无 Claude 卡密">
+        <el-table v-loading="claudeLoading" :data="claudeMappings" border empty-text="暂无 Claude 卡密" @selection-change="onClaudeSelectionChange">
+          <el-table-column type="selection" width="44" />
           <el-table-column label="外部码" min-width="170">
             <template #default="{ row }">
               <span class="mono">{{ row.externalCode }}</span>
@@ -488,7 +498,7 @@
 
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, type Ref } from 'vue';
 import {
   adminCheck,
   deleteMapping,
@@ -513,6 +523,9 @@ import {
   reissueClaudeMapping,
   deleteClaudeMapping,
   listClaudeOrders,
+  batchSmsMappings,
+  batchClaudeMappings,
+  type BatchAction,
   type ImportResultItem,
   type LookupResultItem,
   type MappingItem,
@@ -563,6 +576,9 @@ const smsImportCreated = ref(0);
 const smsMappings = ref<SmsMappingItem[]>([]);
 const smsLoading = ref(false);
 const smsSearch = ref('');
+// 接码卡密列表多选（批量操作）。
+const smsSelected = ref<SmsMappingItem[]>([]);
+const smsBatching = ref(false);
 
 // Claude Pro 卡密
 const claudeImportRaw = ref('');
@@ -573,6 +589,9 @@ const claudeImportCreated = ref(0);
 const claudeMappings = ref<ClaudeMappingItem[]>([]);
 const claudeLoading = ref(false);
 const claudeSearch = ref('');
+// Claude 卡密列表多选（批量操作）。
+const claudeSelected = ref<ClaudeMappingItem[]>([]);
+const claudeBatching = ref(false);
 const claudeLookupRaw = ref('');
 const claudeLookupLoading = ref(false);
 const claudeLookupResults = ref<LookupResultItem[]>([]);
@@ -738,6 +757,8 @@ function handleLogout() {
   smsMappings.value = [];
   smsImportResults.value = [];
   smsLookupResults.value = [];
+  smsSelected.value = [];
+  claudeSelected.value = [];
 }
 
 function onTabChange() {
@@ -993,6 +1014,58 @@ async function removeSmsMapping(row: SmsMappingItem) {
   } catch (error) {
     ElMessage.error((error as Error).message);
   }
+}
+
+// ===== 列表批量操作（接码卡密 / Claude 卡密通用）=====
+const BATCH_LABELS: Record<BatchAction, string> = { enable: '启用', disable: '停用', delete: '删除' };
+
+function onSmsSelectionChange(rows: SmsMappingItem[]) {
+  smsSelected.value = rows;
+}
+function onClaudeSelectionChange(rows: ClaudeMappingItem[]) {
+  claudeSelected.value = rows;
+}
+
+// 统一的批量操作流程：校验勾选 → 删除前二次确认 → 调用接口 → 刷新列表。
+async function runBatch<T extends { id: number }>(
+  action: BatchAction,
+  selected: T[],
+  apiCall: (ids: number[], action: BatchAction) => Promise<number>,
+  reload: () => Promise<void>,
+  busy: Ref<boolean>,
+) {
+  if (!selected.length) {
+    ElMessage.warning('请先勾选要操作的卡密');
+    return;
+  }
+  const label = BATCH_LABELS[action];
+  if (action === 'delete') {
+    try {
+      await ElMessageBox.confirm(`确认删除选中的 ${selected.length} 条卡密？此操作不可恢复。`, '批量删除确认', {
+        type: 'warning',
+        confirmButtonText: '确认删除',
+      });
+    } catch {
+      return;
+    }
+  }
+  busy.value = true;
+  try {
+    const affected = await apiCall(selected.map((r) => r.id), action);
+    ElMessage.success(`已${label} ${affected} 条`);
+    await reload();
+  } catch (error) {
+    ElMessage.error((error as Error).message);
+  } finally {
+    busy.value = false;
+  }
+}
+
+function batchSms(action: BatchAction) {
+  void runBatch(action, smsSelected.value, batchSmsMappings, loadSmsMappings, smsBatching);
+}
+function batchClaude(action: BatchAction) {
+  void runBatch(action, claudeSelected.value, batchClaudeMappings, loadClaudeMappings, claudeBatching);
 }
 
 async function handleImport() {

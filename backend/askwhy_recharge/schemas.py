@@ -51,6 +51,12 @@ class MappingStatusRequest(BaseModel):
     status: str = Field(..., pattern="^(active|disabled)$")
 
 
+class BatchMappingRequest(BaseModel):
+    # 批量操作：启用/停用/删除一组映射（接码卡密、Claude 卡密通用）。
+    ids: list[int] = Field(..., max_length=1000)
+    action: str = Field(..., pattern="^(enable|disable|delete)$")
+
+
 class LookupMappingsRequest(BaseModel):
     # 批量外部码/兑换码，反查其对应的原始卡密（卡密映射与接码卡密通用）。
     external_codes: list[str] = Field(..., alias="externalCodes", max_length=500)

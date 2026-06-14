@@ -30,6 +30,7 @@ from .models import (
     SmsCardMappingModel,
 )
 from .schemas import (
+    BatchMappingRequest,
     CardStatusRequest,
     ClaudeActivateRequest,
     CreateOrderRequest,
@@ -822,6 +823,15 @@ def create_app() -> FastAPI:
         session.commit()
         return {"ok": True}
 
+    @app.post("/api/sms/admin/mappings/batch", dependencies=[Depends(require_admin)])
+    def sms_batch_mappings(
+        payload: BatchMappingRequest,
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        """批量启用/停用/删除接码卡密映射。"""
+        affected = _batch_mapping_op(session, SmsCardMappingModel, payload.ids, payload.action)
+        return {"ok": True, "affected": affected}
+
     # ==================== Claude Pro 充值（Gift 上游）====================
     def resolve_claude_mapping(session: Session, external_input: str) -> ClaudeCardMappingModel | None:
         norm = normalize_external_code(external_input)
@@ -1133,6 +1143,15 @@ def create_app() -> FastAPI:
         session.commit()
         return {"ok": True}
 
+    @app.post("/api/claude/admin/mappings/batch", dependencies=[Depends(require_admin)])
+    def claude_batch_mappings(
+        payload: BatchMappingRequest,
+        session: Session = Depends(get_db_session),
+    ) -> dict:
+        """批量启用/停用/删除 Claude 卡密映射。"""
+        affected = _batch_mapping_op(session, ClaudeCardMappingModel, payload.ids, payload.action)
+        return {"ok": True, "affected": affected}
+
     @app.get("/api/claude/admin/orders", dependencies=[Depends(require_admin)])
     def claude_list_orders(
         q: str = Query("", max_length=120),
@@ -1193,6 +1212,27 @@ def _unique_external_code(session: Session, model, prefix: str = "AW") -> tuple[
         if exists is None:
             return display, norm
     raise HTTPException(status_code=500, detail="外部码生成冲突，请重试")
+
+
+def _batch_mapping_op(session: Session, model, ids: list[int], action: str) -> int:
+    """批量启用/停用/删除映射，返回实际影响的条数（接码卡密、Claude 卡密通用）。
+
+    已重发失效（reissued）的记录不允许再启用/停用，直接跳过；删除不受此限制。
+    """
+
+    if not ids:
+        return 0
+    rows = session.query(model).filter(model.id.in_(ids)).all()
+    affected = 0
+    for row in rows:
+        if action == "delete":
+            session.delete(row)
+            affected += 1
+        elif row.status != "reissued":
+            row.status = "active" if action == "enable" else "disabled"
+            affected += 1
+    session.commit()
+    return affected
 
 
 def _sync_order(session: Session, order_payload: dict) -> None:

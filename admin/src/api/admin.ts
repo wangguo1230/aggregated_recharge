@@ -22,6 +22,12 @@ export function setAdminToken(token: string): void {
 // 管理接口客户端：自动带上 Bearer 口令。
 const api = createApiClient({ getToken: getAdminToken });
 
+// 卡密导入会逐条对上游做校验/生成，数量多时耗时较长，单独放宽超时（默认 30s 不够用）。
+const IMPORT_TIMEOUT = 180_000;
+
+// 批量操作动作（启用/停用/删除）。
+export type BatchAction = 'enable' | 'disable' | 'delete';
+
 export interface MappingItem {
   id: number;
   externalCode: string;
@@ -91,6 +97,7 @@ export async function importMappings(
   const { data } = await api.post<BaseResult & { created: number; total: number; results: ImportResultItem[] }>(
     '/askwhy/admin/mappings/import',
     { realCards, note },
+    { timeout: IMPORT_TIMEOUT },
   );
   const r = unwrap(data);
   return { created: r.created, total: r.total, results: r.results };
@@ -159,6 +166,7 @@ export async function importSmsMappings(
   const { data } = await api.post<BaseResult & { created: number; total: number; results: SmsImportResultItem[] }>(
     '/sms/admin/mappings/import',
     { realCards, note },
+    { timeout: IMPORT_TIMEOUT },
   );
   const r = unwrap(data);
   return { created: r.created, total: r.total, results: r.results };
@@ -193,6 +201,12 @@ export async function reissueSmsMapping(id: number): Promise<string> {
 export async function deleteSmsMapping(id: number): Promise<void> {
   const { data } = await api.delete<BaseResult>(`/sms/admin/mappings/${id}`);
   unwrap(data);
+}
+
+// 批量启用/停用/删除接码卡密映射，返回实际影响条数。
+export async function batchSmsMappings(ids: number[], action: BatchAction): Promise<number> {
+  const { data } = await api.post<BaseResult & { affected: number }>('/sms/admin/mappings/batch', { ids, action });
+  return unwrap(data).affected || 0;
 }
 
 // ===== Claude Pro 卡密映射（Gift 上游）=====
@@ -239,6 +253,7 @@ export async function importClaudeMappings(
   const { data } = await api.post<BaseResult & { created: number; total: number; results: ClaudeImportResultItem[] }>(
     '/claude/admin/mappings/import',
     { realCards, note },
+    { timeout: IMPORT_TIMEOUT },
   );
   const r = unwrap(data);
   return { created: r.created, total: r.total, results: r.results };
@@ -273,6 +288,12 @@ export async function reissueClaudeMapping(id: number): Promise<string> {
 export async function deleteClaudeMapping(id: number): Promise<void> {
   const { data } = await api.delete<BaseResult>(`/claude/admin/mappings/${id}`);
   unwrap(data);
+}
+
+// 批量启用/停用/删除 Claude 卡密映射，返回实际影响条数。
+export async function batchClaudeMappings(ids: number[], action: BatchAction): Promise<number> {
+  const { data } = await api.post<BaseResult & { affected: number }>('/claude/admin/mappings/batch', { ids, action });
+  return unwrap(data).affected || 0;
 }
 
 export async function listClaudeOrders(q = ''): Promise<ClaudeOrderItem[]> {

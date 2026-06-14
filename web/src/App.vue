@@ -12,7 +12,7 @@
         </div>
 
         <nav class="user-rail" :aria-label="t('app.brandName')">
-          <RouterLink to="/" custom v-slot="{ href, navigate }">
+          <RouterLink v-if="SHOW_GPT" to="/recharge" custom v-slot="{ href, navigate }">
             <a
               :href="href"
               class="user-rail__item"
@@ -75,8 +75,8 @@
           <h1>{{ pageTitle }}</h1>
           <p class="user-topbar__desc">{{ pageDescription }}</p>
 
-          <nav v-if="activeSection === 'recharge'" class="user-subnav" :aria-label="t('app.gpt.title')">
-            <RouterLink to="/">{{ t('app.subnav.recharge') }}</RouterLink>
+          <nav v-if="SHOW_GPT && activeSection === 'recharge'" class="user-subnav" :aria-label="t('app.gpt.title')">
+            <RouterLink to="/recharge">{{ t('app.subnav.recharge') }}</RouterLink>
             <RouterLink to="/cards">{{ t('app.subnav.cards') }}</RouterLink>
           </nav>
         </header>
@@ -97,6 +97,9 @@ import { setLocale, type AppLocale } from './i18n';
 
 const route = useRoute();
 const { t, locale } = useI18n();
+
+// GPT 充值暂时下线：置 false 隐藏左侧导航与子导航；改回 true 即可恢复。
+const SHOW_GPT = false;
 
 function changeLang(lang: AppLocale) {
   setLocale(lang);
