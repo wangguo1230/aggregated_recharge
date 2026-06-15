@@ -98,8 +98,8 @@ import { setLocale, type AppLocale } from './i18n';
 const route = useRoute();
 const { t, locale } = useI18n();
 
-// GPT 充值暂时下线：置 false 隐藏左侧导航与子导航；改回 true 即可恢复。
-const SHOW_GPT = false;
+// GPT 充值开关：true 显示左侧导航与子导航；false 一键隐藏。
+const SHOW_GPT = true;
 
 function changeLang(lang: AppLocale) {
   setLocale(lang);
