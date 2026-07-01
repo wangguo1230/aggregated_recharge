@@ -92,6 +92,7 @@
             <span>反查结果</span>
             <strong>命中 {{ lookupFound }} / 共 {{ lookupResults.length }}</strong>
             <el-button size="small" @click="copyLookupReals(lookupResults)">复制全部原始卡密</el-button>
+            <el-button size="small" type="primary" plain @click="exportLookupDual(lookupResults)">导出双码CSV</el-button>
           </div>
           <el-table :data="lookupResults" border size="small" empty-text="无结果">
             <el-table-column label="输入外部码" min-width="150">
@@ -263,6 +264,7 @@
             <span>反查结果</span>
             <strong>命中 {{ smsLookupFound }} / 共 {{ smsLookupResults.length }}</strong>
             <el-button size="small" @click="copyLookupReals(smsLookupResults)">复制全部原始卡密</el-button>
+            <el-button size="small" type="primary" plain @click="exportLookupDual(smsLookupResults)">导出双码CSV</el-button>
           </div>
           <el-table :data="smsLookupResults" border size="small" empty-text="无结果">
             <el-table-column label="输入兑换码" min-width="150">
@@ -766,6 +768,28 @@ function copyLookupReals(results: LookupResultItem[]) {
     return;
   }
   void copyText(cards.join('\n'));
+}
+
+// 反查结果双码导出：两列——映射后码(输入的外部码) + 原码(反查出的真实卡密)。
+function exportLookupDual(results: LookupResultItem[]) {
+  const found = results.filter((r) => r.found && r.realCard);
+  if (!found.length) {
+    ElMessage.warning('没有命中的可导出');
+    return;
+  }
+  const esc = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = ['映射后码,原码', ...found.map((r) => `${esc(r.externalCode || r.input)},${esc(r.realCard)}`)];
+  const content = '﻿' + lines.join('\r\n'); // BOM，Excel 中文不乱码
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `lookup-dual-${found.length}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  ElMessage.success(`已导出 ${found.length} 条（映射后码/原码）`);
 }
 
 async function handleLookup() {
