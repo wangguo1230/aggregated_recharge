@@ -60,9 +60,28 @@ class AskWhySettings:
     # Gift 提交页上游（Claude Pro 充值走此通道）
     gift_base_url: str = "https://gpt.86gamestore.com"
     gift_api_prefix: str = "/api"
+    # 74 渠道上游（zzlokp12）
+    vip_base_url: str = "https://data.zzlokp12.top"
+    vip_api_prefix: str = "/api"
+    # 软件订阅渠道上游（ChatGPT 兑换 API）。
+    soft_base_url: str = "https://duolg.com"
+    soft_api_prefix: str = "/api"
+    # 86 批量：账号行（含 refresh_token）→ session_info 的 OpenAI 换取参数。
+    # client_id 可逗号分隔多个（不同来源账号 client 不同，依次尝试）：新版 + 旧 iOS。
+    openai_oauth_client_id: str = "app_2SKx67EdpoN0G6j64rFvigXD,app_LlGpXReQgckcGGUo2JrYvtJK"
+    openai_oauth_redirect_uri: str = "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback"
+    openai_impersonate: str = "chrome"
     request_timeout_seconds: int = 60
     request_retry_attempts: int = 2
     request_proxy: str = ""
+    # GPT 批量订阅：条目间隔、到账复查次数与间隔、库存不足重刷间隔（秒）、默认并发数。
+    batch_item_interval_seconds: int = 2
+    batch_recheck_attempts: int = 3
+    batch_recheck_interval_seconds: int = 5
+    batch_stock_retry_interval_seconds: int = 3
+    batch_concurrency: int = 1
+    # 累计失败达到该数则暂停整批（疑似系统性问题）；0=关闭，纯跳过继续。
+    batch_failure_pause_threshold: int = 0
     cors_allow_origins: tuple[str, ...] = ("*",)
     host: str = "0.0.0.0"
     port: int = 18424
@@ -102,9 +121,30 @@ def load_askwhy_settings() -> AskWhySettings:
         gift_base_url=str(os.environ.get("GIFT_BASE_URL", "https://gpt.86gamestore.com")).strip().rstrip("/")
         or "https://gpt.86gamestore.com",
         gift_api_prefix=str(os.environ.get("GIFT_API_PREFIX", "/api")).strip() or "/api",
+        vip_base_url=str(os.environ.get("VIP_BASE_URL", "https://data.zzlokp12.top")).strip().rstrip("/")
+        or "https://data.zzlokp12.top",
+        vip_api_prefix=str(os.environ.get("VIP_API_PREFIX", "/api")).strip() or "/api",
+        soft_base_url=str(os.environ.get("SOFT_BASE_URL", "https://duolg.com")).strip().rstrip("/")
+        or "https://duolg.com",
+        soft_api_prefix=str(os.environ.get("SOFT_API_PREFIX", "/api")).strip() or "/api",
+        openai_oauth_client_id=str(
+            os.environ.get("OPENAI_OAUTH_CLIENT_ID", "app_2SKx67EdpoN0G6j64rFvigXD,app_LlGpXReQgckcGGUo2JrYvtJK")
+        ).strip()
+        or "app_2SKx67EdpoN0G6j64rFvigXD,app_LlGpXReQgckcGGUo2JrYvtJK",
+        openai_oauth_redirect_uri=str(
+            os.environ.get("OPENAI_OAUTH_REDIRECT_URI", "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback")
+        ).strip()
+        or "com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback",
+        openai_impersonate=str(os.environ.get("OPENAI_IMPERSONATE", "chrome")).strip() or "chrome",
         request_timeout_seconds=_int_env("ASKWHY_REQUEST_TIMEOUT", 60),
         request_retry_attempts=_int_env("ASKWHY_REQUEST_RETRY", 2),
         request_proxy=str(os.environ.get("ASKWHY_REQUEST_PROXY", "")).strip(),
+        batch_item_interval_seconds=_int_env("GPT_BATCH_ITEM_INTERVAL", 2, minimum=0),
+        batch_recheck_attempts=_int_env("GPT_BATCH_RECHECK_ATTEMPTS", 3, minimum=0),
+        batch_recheck_interval_seconds=_int_env("GPT_BATCH_RECHECK_INTERVAL", 5, minimum=0),
+        batch_stock_retry_interval_seconds=_int_env("GPT_BATCH_STOCK_RETRY_INTERVAL", 3, minimum=1),
+        batch_concurrency=_int_env("GPT_BATCH_CONCURRENCY", 1, minimum=1),
+        batch_failure_pause_threshold=_int_env("GPT_BATCH_FAILURE_PAUSE_THRESHOLD", 0, minimum=0),
         cors_allow_origins=cors_origins,
         host=str(os.environ.get("ASKWHY_HOST", "0.0.0.0")).strip() or "0.0.0.0",
         port=_int_env("ASKWHY_PORT", 18424),

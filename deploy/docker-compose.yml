@@ -1,5 +1,6 @@
 # AskWhy 充值 — 部署编排（接 1Panel 现有 PostgreSQL + 外部网络）
-# 镜像由 GitHub Actions 推送到 ghcr.io；变量从同目录 .env 读取（见 .env.example）。
+# 镜像由本地构建后推送到 ghcr.io（git push 到 main 触发 pre-push 钩子，或手动
+# ./scripts/build-and-push.sh）；变量从同目录 .env 读取（见 .env.example）。
 #
 # 使用：
 #   1) cp .env.example .env && 填好 .env（数据库、密钥、口令）
@@ -18,6 +19,21 @@ services:
       ASKWHY_REQUEST_PROXY: ${ASKWHY_REQUEST_PROXY:-}
       ASKWHY_HOST: 0.0.0.0
       ASKWHY_PORT: 18424
+      # 充值渠道上游（默认值见 settings.py，可在 .env 覆盖）
+      GIFT_BASE_URL: ${GIFT_BASE_URL:-https://gpt.86gamestore.com}
+      VIP_BASE_URL: ${VIP_BASE_URL:-https://data.zzlokp12.top}
+      SOFT_BASE_URL: ${SOFT_BASE_URL:-https://duolg.com}
+      # 86 批量账号行(含 rt) 换 token
+      OPENAI_OAUTH_CLIENT_ID: ${OPENAI_OAUTH_CLIENT_ID:-app_2SKx67EdpoN0G6j64rFvigXD,app_LlGpXReQgckcGGUo2JrYvtJK}
+      OPENAI_OAUTH_REDIRECT_URI: ${OPENAI_OAUTH_REDIRECT_URI:-com.openai.chat://auth0.openai.com/ios/com.openai.chat/callback}
+      OPENAI_IMPERSONATE: ${OPENAI_IMPERSONATE:-chrome}
+      # 批量执行参数
+      GPT_BATCH_CONCURRENCY: ${GPT_BATCH_CONCURRENCY:-1}
+      GPT_BATCH_ITEM_INTERVAL: ${GPT_BATCH_ITEM_INTERVAL:-2}
+      GPT_BATCH_RECHECK_ATTEMPTS: ${GPT_BATCH_RECHECK_ATTEMPTS:-3}
+      GPT_BATCH_RECHECK_INTERVAL: ${GPT_BATCH_RECHECK_INTERVAL:-5}
+      GPT_BATCH_STOCK_RETRY_INTERVAL: ${GPT_BATCH_STOCK_RETRY_INTERVAL:-3}
+      GPT_BATCH_FAILURE_PAUSE_THRESHOLD: ${GPT_BATCH_FAILURE_PAUSE_THRESHOLD:-0}
     networks:
       - 1panel-network
 

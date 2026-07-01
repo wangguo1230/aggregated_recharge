@@ -87,10 +87,49 @@ class SmsImportMappingsRequest(BaseModel):
     model_config = {"populate_by_name": True}
 
 
-# ---- Claude Pro 充值相关请求体 ----
-class ClaudeActivateRequest(BaseModel):
-    # 外部码 + 客户的 Claude Organization ID（uid，Account 页面里的 Organization ID）。
-    card_code: str = Field(..., alias="cardCode", min_length=1)
-    uid: str = Field(..., min_length=1, max_length=120)
+# ---- GPT 充值相关请求体（直调 Gift，无外部码映射）----
+class GptCheckRequest(BaseModel):
+    # 真实 redeemgpt.com cdkey（客户直接输入，不走外部码映射）。
+    cdkey: str = Field(..., min_length=1, max_length=120)
+
+
+class GptActivateRequest(BaseModel):
+    # 真实 cdkey + 账号 Session JSON（session_info），可选 force 跳过套餐检查。
+    cdkey: str = Field(..., min_length=1, max_length=120)
+    session_info: str = Field(..., alias="sessionInfo", min_length=1)
+    force: bool = Field(False)
+
+    model_config = {"populate_by_name": True}
+
+
+class VipVerifyRequest(BaseModel):
+    # 74 渠道验卡：cdk + 账号 JSON。
+    cdk: str = Field(..., min_length=1, max_length=120)
+    account: str = Field(..., min_length=1)
+
+
+class VipActivateRequest(BaseModel):
+    # 74 渠道充值：cdk + 账号 JSON。
+    cdk: str = Field(..., min_length=1, max_length=120)
+    account: str = Field(..., min_length=1)
+
+
+class GptBatchItemInput(BaseModel):
+    # 一条批量订阅输入：cdkey + 账号 Session JSON（1:1 配对）。
+    cdkey: str = Field(..., min_length=1, max_length=120)
+    session_info: str = Field(..., alias="sessionInfo", min_length=1)
+
+    model_config = {"populate_by_name": True}
+
+
+class GptBatchCreateRequest(BaseModel):
+    # 批量订阅任务：一次最多 500 条，后台执行。
+    items: list[GptBatchItemInput] = Field(..., min_length=1, max_length=500)
+    # 渠道：gpt86（86GPT）/ vip74（74 渠道）；省略默认 gpt86。
+    channel: str = Field("gpt86", max_length=20)
+    force: bool = Field(False)
+    note: str = Field("", max_length=255)
+    # 批内并发数；0/省略表示用服务端默认值。上限由服务端 clamp。
+    concurrency: int = Field(0, ge=0, le=50)
 
     model_config = {"populate_by_name": True}

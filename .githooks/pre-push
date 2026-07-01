@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# git push 到 main 时，本地构建并推送 Docker 镜像（替代 GitHub Actions）。
+# 启用一次：  git config core.hooksPath .githooks
+#
+# 说明：镜像构建/推送失败不会阻断代码推送（只告警），可稍后手动 ./scripts/build-and-push.sh
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# stdin 每行： <本地ref> <本地sha> <远端ref> <远端sha>
+push_main=0
+while read -r _localref _localsha remoteref _remotesha; do
+  [ "$remoteref" = "refs/heads/main" ] && push_main=1
+done
+
+[ "$push_main" = "1" ] || exit 0
+
+echo "── pre-push：检测到推送 main，本地构建镜像并推送 ──"
+if "$ROOT/scripts/build-and-push.sh"; then
+  echo "── 镜像已推送，代码继续推送 ──"
+else
+  echo "⚠️  镜像构建/推送失败（不阻断代码推送）。稍后可手动：./scripts/build-and-push.sh" >&2
+fi
+exit 0

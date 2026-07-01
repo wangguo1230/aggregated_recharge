@@ -209,32 +209,9 @@ export async function batchSmsMappings(ids: number[], action: BatchAction): Prom
   return unwrap(data).affected || 0;
 }
 
-// ===== Claude Pro 卡密映射（Gift 上游）=====
-export interface ClaudeMappingItem {
+export interface GptOrderItem {
   id: number;
-  externalCode: string;
   realCard: string;
-  giftName: string;
-  app: string;
-  status: string;
-  note: string;
-  createdAt: string;
-}
-
-export interface ClaudeImportResultItem {
-  realCard: string;
-  externalCode?: string;
-  giftName?: string;
-  status: string;
-  message?: string;
-  checkOk?: boolean;
-}
-
-export interface ClaudeOrderItem {
-  id: number;
-  externalCode: string;
-  realCard: string;
-  uid: string;
   giftName: string;
   useStatus: number;
   status: string;
@@ -246,59 +223,126 @@ export interface ClaudeOrderItem {
   updatedAt: string;
 }
 
-export async function importClaudeMappings(
-  realCards: string[],
+// GPT 充值直调 Gift（无映射），仅有充值记录可供对账/售后。
+export async function listGptOrders(q = ''): Promise<GptOrderItem[]> {
+  const { data } = await api.get<BaseResult & { items: GptOrderItem[] }>('/gpt/admin/orders', {
+    params: { q },
+  });
+  return unwrap(data).items || [];
+}
+
+// ===== GPT 批量订阅 =====
+export interface GptBatchItemInput {
+  cdkey: string;
+  sessionInfo: string;
+}
+
+export interface GptBatchCreateResultItem {
+  seq: number;
+  email: string;
+  cdkeyLast4: string;
+  status: string;
+  message: string;
+}
+
+export interface GptBatchSummary {
+  id: number;
+  channel: string;
+  status: string;
+  force: boolean;
+  note: string;
+  total: number;
+  concurrency: number;
+  cancelRequested: boolean;
+  inFlight: number;
+  retryWaiting: boolean;
+  pausedReason: string;
+  counts: Record<string, number>;
+  createdAt: string;
+  startedAt: string;
+  finishedAt: string;
+}
+
+export interface GptBatchItem {
+  seq: number;
+  email: string;
+  cdkeyLast4: string;
+  status: string;
+  useStatus: number | null;
+  resultCode: string;
+  resultMessage: string;
+  account: string;
+  completedAt: string;
+  attempts: number;
+}
+
+export async function createGptBatch(
+  items: GptBatchItemInput[],
+  channel: string,
+  force: boolean,
   note = '',
-): Promise<{ created: number; total: number; results: ClaudeImportResultItem[] }> {
-  const { data } = await api.post<BaseResult & { created: number; total: number; results: ClaudeImportResultItem[] }>(
-    '/claude/admin/mappings/import',
-    { realCards, note },
-    { timeout: IMPORT_TIMEOUT },
-  );
+  concurrency = 0,
+): Promise<{ batchId: number; total: number; accepted: number; skipped: number; results: GptBatchCreateResultItem[] }> {
+  const { data } = await api.post<
+    BaseResult & { batchId: number; total: number; accepted: number; skipped: number; results: GptBatchCreateResultItem[] }
+  >('/gpt/admin/batch', { items, channel, force, note, concurrency }, { timeout: IMPORT_TIMEOUT });
   const r = unwrap(data);
-  return { created: r.created, total: r.total, results: r.results };
+  return { batchId: r.batchId, total: r.total, accepted: r.accepted, skipped: r.skipped, results: r.results };
 }
 
-export async function listClaudeMappings(q = ''): Promise<ClaudeMappingItem[]> {
-  const { data } = await api.get<BaseResult & { items: ClaudeMappingItem[] }>('/claude/admin/mappings', {
-    params: { q },
+export async function listGptBatches(channel = '', q = '', limit = 100): Promise<GptBatchSummary[]> {
+  const { data } = await api.get<BaseResult & { items: GptBatchSummary[] }>('/gpt/admin/batch', {
+    params: { channel, q, limit },
   });
   return unwrap(data).items || [];
 }
 
-// 批量外部码反查原始 cdkey。
-export async function lookupClaudeMappings(externalCodes: string[]): Promise<LookupResultItem[]> {
-  const { data } = await api.post<BaseResult & { results: LookupResultItem[] }>('/claude/admin/mappings/lookup', {
-    externalCodes,
-  });
-  return unwrap(data).results || [];
+export async function getGptBatch(id: number): Promise<{ batch: GptBatchSummary; items: GptBatchItem[] }> {
+  const { data } = await api.get<BaseResult & { batch: GptBatchSummary; items: GptBatchItem[] }>(`/gpt/admin/batch/${id}`);
+  const r = unwrap(data);
+  return { batch: r.batch, items: r.items || [] };
 }
 
-export async function updateClaudeMappingStatus(id: number, status: 'active' | 'disabled'): Promise<void> {
-  const { data } = await api.patch<BaseResult>(`/claude/admin/mappings/${id}`, { status });
+export async function cancelGptBatch(id: number): Promise<void> {
+  const { data } = await api.post<BaseResult>(`/gpt/admin/batch/${id}/cancel`, {});
   unwrap(data);
 }
 
-// 重新生成外部码：旧码失效，新建指向同一真实 cdkey 的新外部码，返回新码。
-export async function reissueClaudeMapping(id: number): Promise<string> {
-  const { data } = await api.post<BaseResult & { externalCode?: string }>(`/claude/admin/mappings/${id}/reissue`, {});
-  return unwrap(data).externalCode || '';
-}
-
-export async function deleteClaudeMapping(id: number): Promise<void> {
-  const { data } = await api.delete<BaseResult>(`/claude/admin/mappings/${id}`);
+// concurrency>0 时同时更新该批次的并发数（重跑用新并发）。
+export async function resumeGptBatch(id: number, concurrency = 0): Promise<void> {
+  const { data } = await api.post<BaseResult>(`/gpt/admin/batch/${id}/resume`, {}, { params: { concurrency } });
   unwrap(data);
 }
 
-// 批量启用/停用/删除 Claude 卡密映射，返回实际影响条数。
-export async function batchClaudeMappings(ids: number[], action: BatchAction): Promise<number> {
-  const { data } = await api.post<BaseResult & { affected: number }>('/claude/admin/mappings/batch', { ids, action });
-  return unwrap(data).affected || 0;
+// 重新提交单个失败/跳过的条目；NEEDS_REVIEW 需 force=true 显式确认。
+export async function retryGptBatchItem(batchId: number, seq: number, force = false, concurrency = 0): Promise<void> {
+  const { data } = await api.post<BaseResult>(
+    `/gpt/admin/batch/${batchId}/items/${seq}/retry`,
+    {},
+    { params: { force, concurrency } },
+  );
+  unwrap(data);
 }
 
-export async function listClaudeOrders(q = ''): Promise<ClaudeOrderItem[]> {
-  const { data } = await api.get<BaseResult & { items: ClaudeOrderItem[] }>('/claude/admin/orders', {
-    params: { q },
-  });
-  return unwrap(data).items || [];
+// 一键重试整批失败/跳过条目；includeReview=true 连 NEEDS_REVIEW 一起重试。
+export async function retryFailedGptBatch(batchId: number, includeReview = false, concurrency = 0): Promise<number> {
+  const { data } = await api.post<BaseResult & { reset?: number }>(
+    `/gpt/admin/batch/${batchId}/retry-failed`,
+    {},
+    { params: { include_review: includeReview, concurrency } },
+  );
+  return unwrap(data).reset || 0;
+}
+
+// 导出批次结果 CSV（浏览器下载）。
+export async function exportGptBatch(batchId: number): Promise<void> {
+  const res = await api.get(`/gpt/admin/batch/${batchId}/export`, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data as Blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `gpt-batch-${batchId}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }

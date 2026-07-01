@@ -2,8 +2,9 @@
 
 上游响应结构：{"success": bool, "msg": str, "data": object|str, "code": str?}
 统一在 base_url + api_prefix（默认 /api）下：
-- GET  check?cdkey=xxx          查询 CDKEY（返回 data.app / gift_name / use_status 等）
-- POST activate {cdkey, uid}    提交激活（Claude 只需 uid，无需 session_info）
+- GET  check?cdkey=xxx                查询 CDKEY（返回 data.app / gift_name / use_status 等）
+- POST activate {cdkey, uid}          Claude 提交激活（只需 uid）
+- POST activate {cdkey, session_info} GPT 提交激活（session_info 为账号 session JSON，可带 force=1）
 
 返回上游原始 JSON（含 success 字段），由调用方判断业务结果；网络/解析异常抛 GiftApiError。
 """
@@ -47,6 +48,17 @@ class GiftClient:
     def activate(self, cdkey: str, uid: str) -> dict[str, Any]:
         # 激活非幂等：失败不重试，避免同一卡密重复提交导致重复充值。
         return self._request("POST", "activate", attempts=1, json={"cdkey": cdkey, "uid": uid})
+
+    def activate_session(self, cdkey: str, session_info: str, force: bool = False) -> dict[str, Any]:
+        """GPT / claude_s 提交激活：提交 session_info（GPT 为账号 session JSON）。
+
+        force=True 仅 GPT 生效，传 1 跳过账号 plan 检查（不会绕过近 7 天防重）。
+        同样非幂等，失败不重试。
+        """
+        body: dict[str, Any] = {"cdkey": cdkey, "session_info": session_info}
+        if force:
+            body["force"] = 1
+        return self._request("POST", "activate", attempts=1, json=body)
 
     # ---- 内部 ----
     def _request(self, method: str, path: str, attempts: int | None = None, **kwargs: Any) -> dict[str, Any]:

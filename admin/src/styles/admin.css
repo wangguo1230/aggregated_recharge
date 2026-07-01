@@ -142,6 +142,19 @@ body {
   margin-top: 22px;
 }
 
+.admin-hint {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--recharge-muted);
+}
+.admin-hint code {
+  padding: 1px 5px;
+  background: #eef3ef;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
 /* 紧凑表格 */
 .admin-card .el-table {
   font-size: 13px;
