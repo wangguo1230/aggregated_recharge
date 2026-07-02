@@ -92,6 +92,7 @@
             <span>反查结果</span>
             <strong>命中 {{ lookupFound }} / 共 {{ lookupResults.length }}</strong>
             <el-button size="small" @click="copyLookupReals(lookupResults)">复制全部原始卡密</el-button>
+            <el-button size="small" @click="copyLookupDual(lookupResults)">复制双码</el-button>
             <el-button size="small" type="primary" plain @click="exportLookupDual(lookupResults)">导出双码CSV</el-button>
           </div>
           <el-table :data="lookupResults" border size="small" empty-text="无结果">
@@ -264,6 +265,7 @@
             <span>反查结果</span>
             <strong>命中 {{ smsLookupFound }} / 共 {{ smsLookupResults.length }}</strong>
             <el-button size="small" @click="copyLookupReals(smsLookupResults)">复制全部原始卡密</el-button>
+            <el-button size="small" @click="copyLookupDual(smsLookupResults)">复制双码</el-button>
             <el-button size="small" type="primary" plain @click="exportLookupDual(smsLookupResults)">导出双码CSV</el-button>
           </div>
           <el-table :data="smsLookupResults" border size="small" empty-text="无结果">
@@ -790,6 +792,18 @@ function exportLookupDual(results: LookupResultItem[]) {
   a.remove();
   URL.revokeObjectURL(url);
   ElMessage.success(`已导出 ${found.length} 条（映射后码/原码）`);
+}
+
+// 复制双码：每行 映射后码----原码（接码即 新卡密----手机号----查询URL）。
+function copyLookupDual(results: LookupResultItem[]) {
+  const lines = results
+    .filter((r) => r.found && r.realCard)
+    .map((r) => `${r.externalCode || r.input}----${r.realCard}`);
+  if (!lines.length) {
+    ElMessage.warning('没有命中的可复制');
+    return;
+  }
+  void copyText(lines.join('\n'));
 }
 
 async function handleLookup() {
